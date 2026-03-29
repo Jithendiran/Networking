@@ -1,16 +1,3 @@
-I'm new to networking
-I had started with TCP state management, descriptors, sync flow
-i need you to write in a detailed way, even if i miss something you have to include that in the correct place
-this will be a be a go to place for me, after 6 months if i come back, just by reading i should able to understand the concepts without any hiccups, my learning approach is brick by brick and independent to dependent thing
-
-Explain this with simple english, no analogym professional english, only use third person view (should not use words like i, you,...)
-
-i would like to start session layer
-
-```
-
-```
-
 ## TCP
 TCP is a stateful protocol. Each endpoint (Client and Server) maintains a state to track the progress of a connection. Transitions between states occur based on three triggers:
 1. User Commands: An application requests to open or close a connection.
