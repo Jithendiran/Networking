@@ -154,3 +154,32 @@ Here is the breakdown of how these channels are kept separate and identified.
     | **4. Data Transfer** | Server sends data to Client. | `recipient channel` (0) |
 
     ![multiplex](./ssh_channel_multiplexing.svg)
+
+### The channel lifecycle — complete state machine
+
+1. **NO CHANNEL** — Before `CHANNEL_OPEN` is sent, no channel exists. Channels are created on demand — one per activity. There is no limit specified in the RFC but implementations impose one (OpenSSH default: 10 channels per connection). The opener picks a local channel number. Both sides maintain separate numbering — a sender's channel 3 and a receiver's channel 3 are different identifiers. Every message includes the recipient channel number to avoid ambiguity.
+
+2. **CHANNEL_OPEN** (msg 90) — Sender includes: channel type (session / direct-tcpip / forwarded-tcpip / x11), sender channel number (local ID), initial window size (how many bytes receiver can send before getting a window update), maximum packet size (largest payload allowed per message), and type-specific data. For session type: no extra fields. For direct-tcpip (port forward): destination host, port, originator host, port. 
+
+    Why declare window size upfront? SSH has its own flow control independent of TCP — prevents a fast sender from overwhelming a slow receiver at the application level.
+
+
+- **CHANNEL_OPEN_FAILURE** (msg 92) — Server rejects the open request. Contains: recipient channel number, reason code (1=administratively prohibited, 2=connect failed, 3=unknown channel type, 4=resource shortage), description string, language tag. After failure, no channel is created. The client may try again or give up. This is how a firewall can block specific channel types — by injecting a CHANNEL_OPEN_FAILURE when it sees a direct-tcpip open request to a forbidden destination.
+
+3. **CHANNEL_OPEN_CONFIRMATION** (msg 91) — Server accepts. Contains: recipient channel (client local ID), sender channel (server local ID), initial window size, maximum packet size. After this, both sides have two channel IDs — their own local ID and the remote ID. Every outgoing message uses the REMOTE ID in the recipient field, not the local ID. This is subtle and a common source of implementation bugs.
+
+4. **CHANNEL_REQUEST** (msg 98) — After a session channel opens, requests configure what the channel does. 
+
+    * Common request types: pty-req (allocate a pseudo-terminal — terminal type, dimensions), env (set environment variable), shell (start a shell), exec (run a command — payload is the command string), subsystem (start a named subsystem — payload is subsystem name, e.g. sftp), window-change (resize terminal). 
+    * The want_reply field controls whether the server sends `CHANNEL_SUCCESS` or `CHANNEL_FAILURE` back. For exec: the command string is here — if it says scp -t /remote/path, an SCP upload is starting. This is the message/command a firewall inspects to detect SCP.
+
+5. **CHANNEL_DATA** (msg 94) — The actual payload of the channel. Contains: recipient channel number, data string (the bytes). This is where SSH command output flows, where SCP file bytes travel, where SFTP protocol messages live. `CHANNEL_EXTENDED_DATA` (msg 95) carries stderr — same format but with an additional data_type_code (1 = stderr). The sender must track how many bytes have been sent against the receiver's window. If window is exhausted, sending must stop until a `CHANNEL_WINDOW_ADJUST` arrives.
+
+6. **CHANNEL_EOF** (msg 96) — Means: no more data from this side. Like TCP FIN but for a channel. The other side can still send. Half-closed channels are valid. 
+    `CHANNEL_CLOSE` (msg 97) — Means: I am done entirely, release the channel. Both sides must send CHANNEL_CLOSE before the channel is gone. 
+    
+    Why two messages? EOF signals end of data stream. CLOSE signals release of the channel resource. A channel can be EOFed without CLOSEing — e.g. SCP sends EOF after the file data, then waits for the server to confirm receipt before both sides CLOSE.
+
+
+## Notes
+* SCP is a deceptively simple protocol. It runs inside a session channel where the exec request carries `scp -t /destination` (upload) or `scp -f /source` (download). The entire SCP exchange is a text-based handshake followed by raw binary file bytes.
