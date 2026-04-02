@@ -183,3 +183,120 @@ Here is the breakdown of how these channels are kept separate and identified.
 
 ## Notes
 * SCP is a deceptively simple protocol. It runs inside a session channel where the exec request carries `scp -t /destination` (upload) or `scp -f /source` (download). The entire SCP exchange is a text-based handshake followed by raw binary file bytes.
+
+## SSH state machine types for each
+
+Every SSH message has a numeric type byte. This table to identify what is happening on any channel:
+
+```
+Transport layer messages:
+  1   SSH_MSG_DISCONNECT
+  2   SSH_MSG_IGNORE              ← keepalive mechanism
+  3   SSH_MSG_UNIMPLEMENTED
+  4   SSH_MSG_DEBUG
+  5   SSH_MSG_SERVICE_REQUEST
+  6   SSH_MSG_SERVICE_ACCEPT
+  20  SSH_MSG_KEXINIT
+  21  SSH_MSG_NEWKEYS
+
+Key exchange messages (algorithm-specific):
+  30  SSH_MSG_KEXECDH_INIT        ← client ephemeral key
+  31  SSH_MSG_KEXECDH_REPLY       ← server host key + signature
+
+Auth messages:
+  50  SSH_MSG_USERAUTH_REQUEST
+  51  SSH_MSG_USERAUTH_FAILURE
+  52  SSH_MSG_USERAUTH_SUCCESS
+  53  SSH_MSG_USERAUTH_BANNER     ← legal warning banners
+  60  SSH_MSG_USERAUTH_PK_OK      ← publickey challenge
+  60  SSH_MSG_USERAUTH_INFO_REQUEST      ← keyboard-interactive
+  61  SSH_MSG_USERAUTH_INFO_RESPONSE
+
+Connection protocol messages:
+  80  SSH_MSG_GLOBAL_REQUEST
+  81  SSH_MSG_REQUEST_SUCCESS
+  82  SSH_MSG_REQUEST_FAILURE
+  90  SSH_MSG_CHANNEL_OPEN
+  91  SSH_MSG_CHANNEL_OPEN_CONFIRMATION
+  92  SSH_MSG_CHANNEL_OPEN_FAILURE
+  93  SSH_MSG_CHANNEL_WINDOW_ADJUST   ← flow control
+  94  SSH_MSG_CHANNEL_DATA            ← actual payload
+  95  SSH_MSG_CHANNEL_EXTENDED_DATA   ← stderr
+  96  SSH_MSG_CHANNEL_EOF
+  97  SSH_MSG_CHANNEL_CLOSE
+  98  SSH_MSG_CHANNEL_REQUEST         ← shell/exec/subsystem
+  99  SSH_MSG_CHANNEL_SUCCESS
+  100 SSH_MSG_CHANNEL_FAILURE
+```
+
+### The global disconnect message
+`SSH_MSG_DISCONNECT` (msg 1) is the clean shutdown message for the entire connection — not a channel, the whole session. It contains a reason code and description. Common reason codes:
+
+```
+1   SSH_DISCONNECT_HOST_NOT_ALLOWED_TO_CONNECT
+2   SSH_DISCONNECT_PROTOCOL_ERROR
+3   SSH_DISCONNECT_KEY_EXCHANGE_FAILED
+11  SSH_DISCONNECT_SERVICE_NOT_AVAILABLE
+13  SSH_DISCONNECT_BY_APPLICATION      ← normal logout
+14  SSH_DISCONNECT_TOO_MANY_CONNECTIONS
+```
+
+## The complete timeline — everything together
+From TCP connect to SCP file transfer, a complete SSH session timeline looks like this:
+
+```
+t=0ms    TCP SYN →
+t=1ms    ← TCP SYN-ACK
+t=2ms    TCP ACK →
+---------------------Transport--------------------------------------
+t=2ms    SSH-2.0-OpenSSH_8.9\r\n →          (version)
+t=2ms    ← SSH-2.0-OpenSSH_8.9p1\r\n        (version, simultaneous)
+
+t=3ms    KEXINIT(20) →                       (algorithm lists)
+t=3ms    ← KEXINIT(20)                       (simultaneous)
+
+t=4ms    KEXECDH_INIT(30) →                  (client ephemeral pubkey)
+t=6ms    ← KEXECDH_REPLY(31)                 (server host key + signature)
+--------Client verified Server is genuine ---------------------------
+t=6ms    NEWKEYS(21) →                        (switch to encryption)
+t=6ms    ← NEWKEYS(21)
+
+══ everything below encrypted ══
+-----------------------Auth------------------------------------------
+t=7ms    SERVICE_REQUEST(5) "ssh-userauth" →
+t=8ms    ← SERVICE_ACCEPT(6)
+
+t=8ms    USERAUTH_REQUEST(50) none →          (probe for methods)
+t=9ms    ← USERAUTH_FAILURE(51) [publickey]
+
+t=9ms    USERAUTH_REQUEST(50) publickey →     (probe key)
+t=10ms   ← USERAUTH_PK_OK(60)
+
+t=10ms   USERAUTH_REQUEST(50) publickey+sig → (signed proof)
+t=11ms   ← USERAUTH_SUCCESS(52)
+----------------------connection------------------------------------
+t=11ms   CHANNEL_OPEN(90) session chan=0 →
+t=12ms   ← CHANNEL_OPEN_CONFIRMATION(91)
+
+t=12ms   CHANNEL_REQUEST(98) exec "scp -t /tmp" →
+t=13ms   ← CHANNEL_SUCCESS(99)
+
+t=13ms   ← CHANNEL_DATA(94) 0x00             (scp ready)
+
+t=13ms   CHANNEL_DATA(94) "C0644 1048576 payload.sh\n" →
+t=14ms   ← CHANNEL_DATA(94) 0x00             (ready for bytes)
+
+t=14ms   CHANNEL_DATA(94) [1048576 raw bytes] →
+t=120ms  (transfer complete)
+
+t=120ms  CHANNEL_DATA(94) 0x00 →             (end of file)
+t=121ms  ← CHANNEL_DATA(94) 0x00             (confirmed)
+-----------------------closing------------------------------------------
+t=121ms  CHANNEL_EOF(96) →
+t=122ms  ← CHANNEL_EOF(96)
+t=122ms  CHANNEL_CLOSE(97) →
+t=122ms  ← CHANNEL_CLOSE(97)
+------------------------------------TCP closing--------------------------
+t=123ms  DISCONNECT(1) "Bye" →
+t=123ms  TCP FIN →
+```
