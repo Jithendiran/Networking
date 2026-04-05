@@ -3,7 +3,8 @@
 - SSH is not one protocol. It is a stack of four distinct sub-protocols, each layered on top of the previous one. Every sub-protocol has its own state machine, its own message types, and its own responsibilities. 
 ![ssh stack](ssh_protocol_stack.svg)
 
-## The SSH packet format
+## 1. SSH Protocol Architecture (RFC 4251)
+### The SSH packet format
 - When data is sent via SSH, it is organized into a specific structure called a packet.
 - Every single SSH message — regardless of which sub-protocol sends it — is wrapped in this binary envelope:
 ![ssh packet](ssh_packet_format.svg)
@@ -21,7 +22,7 @@ This is the most important part of the packet. The Payload contains the actual m
 5. Message Authentication Code (MAC)
 The MAC is a digital signature used to ensure the packet was not altered during transit. It acts like a wax seal on an envelope; if the seal is broken or does not match, the receiver knows the data is untrustworthy and will discard it.
 
-## 1. SSH Transport Layer state machine (RFC 4253)
+## 2. SSH Transport Layer state machine (RFC 4253)
 This is the first sub-protocol to run. Nothing else can happen until it completes. Its job is to go from a raw TCP connection to a fully encrypted, integrity-checked tunnel.
 
 1. **TCP CONNECTED** — The TCP 3-way handshake just completed. Both sides have a reliable byte stream. No SSH has happened yet. The very first thing both sides do simultaneously is send a plaintext version string — no waiting, no handshake, just send it immediately.
@@ -64,7 +65,7 @@ Server → Client:   SSH_MSG_SERVICE_ACCEPT  (msg=6)
 
 The `SSH_MSG_SERVICE_REQUEST` is the bridge message — transport layer says "I am encrypted and ready, please start the auth service."
 
-## 2. SSH Authentication Protocol state machine (RFC 4252)
+## 3. SSH Authentication Protocol state machine (RFC 4252)
 This protocol runs entirely inside the encrypted tunnel. Its job is to prove the client's identity to the server. The server drives the conversation — it tells the client which methods are acceptable.
 
 1. **SERVICE REQUEST** — Client sends `SSH_MSG_SERVICE_REQUEST` naming the service `ssh-userauth`. Server replies `SSH_MSG_SERVICE_ACCEPT`. Why this step? The transport layer is generic — it could carry other services besides userauth. This request explicitly activates the auth sub-protocol. After acceptance, the auth exchange begins.
@@ -118,7 +119,7 @@ For publickey method, additional fields:
 The service name field `ssh-connection` is always present in auth requests — it tells the server which service will be used after authentication succeeds. This binding prevents an auth exchange for one service being replayed for a different service.
 
 
-## 3. SSH Connection Protocol state machine (RFC 4254)
+## 4. SSH Connection Protocol state machine (RFC 4254)
 
 This is the richest sub-protocol. It multiplexes independent logical channels over the single encrypted TCP connection.
 
@@ -180,6 +181,8 @@ Here is the breakdown of how these channels are kept separate and identified.
     
     Why two messages? EOF signals end of data stream. CLOSE signals release of the channel resource. A channel can be EOFed without CLOSEing — e.g. SCP sends EOF after the file data, then waits for the server to confirm receipt before both sides CLOSE.
 
+## Detailed explaination 
+1. [SSH connection](./SSH_connection.md)
 
 ## Notes
 * SCP is a deceptively simple protocol. It runs inside a session channel where the exec request carries `scp -t /destination` (upload) or `scp -f /source` (download). The entire SCP exchange is a text-based handshake followed by raw binary file bytes.
