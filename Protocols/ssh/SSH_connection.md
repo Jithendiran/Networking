@@ -216,6 +216,7 @@ SSH uses the exchange hash `H`, the shared secret `S`, and a set of single-lette
 | **Encryption Key (S to C)** | $D$ |The actual key used to encrypt data | Server $\rightarrow$ Client |
 | **Integrity Key (C to S)** | $E$ |The MAC key to prevent tampering | Client $\rightarrow$ Server |
 | **Integrity Key (S to C)** | $F$ |The MAC key to prevent tampering | Server $\rightarrow$ Client |
+
 ![new Keys](./ssh_new_keys_derivation.svg)
 
 At this point both parties have all the keys
