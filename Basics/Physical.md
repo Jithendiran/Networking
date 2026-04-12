@@ -70,15 +70,19 @@ For discussion let's take *IEEE 802.3 Ethernet*
 Each bit period is split into two equal halves. The transition that happens at the midpoint of the bit period encodes the bit value:
 - Bit 0 = transition from HIGH  $\rightarrow$ high LOW at the midpoint
 - Bit 1 = transition from LOW $\rightarrow$ HIGH at the midpoint
+
 Because Manchester encoding requires a transition in the middle of every bit, the signal must change states twice as fast as the actual data rate.
 
 ![Manchester](./res/manchester_vs_nrz_encoding.svg)
 
-Manchester uses 2 $\times$ the frequency (bandwidth). To send `N` bits per second, `NRZ` needs `N Hz` of bandwidth. Manchester needs `2*N Hz` — because every bit has at least one mid-period transition, and consecutive identical bits also add a boundary transition (like the 1 $\rightarrow$ 1 boundary at position 3$\rightarrow$4 in the diagram, marked in orange). That boundary transition carries no data — it just repositions the line for the next bit's mid-transition.
+- Manchester uses 2 $\times$ the frequency (bandwidth). To send `N` bits per second, `NRZ` needs `N Hz` of bandwidth. Manchester needs `2*N Hz` — because every bit has at least one mid-period transition, and consecutive identical bits also add a boundary transition (like the 1 $\rightarrow$ 1 boundary at position 3 $\rightarrow$ 4 in the diagram, marked in orange). That boundary transition carries no data — it just repositions the line for the next bit's mid-transition.
+
+- Manchester encoding uses one full clock cycle to transmit a single bit, but because that bit must contain a transition in the middle, the "signal" is changing twice as fast as the "data."
+- It is one clock cycle per bit, but it effectively uses both the rising edge and the falling edge of an internal faster clock.
 
 | | NRZ | Manchester |
 |---|---|---|
-| Bandwidth needed | 1× | 2× |
+| Bandwidth needed | 1x | 2x |
 | Self-clocking | No | Yes |
 | Sync loss risk | High (long runs) | None |
 | Used in | Serial, USB | Ethernet (10BASE-T), IR remotes |
@@ -101,13 +105,19 @@ Manchester Encoding is used in systems where reliable clock recovery is more imp
 - RFID communication
 - Industrial sensors and serial protocols
 
-### Complete Mental Model
-Step 1. Sender encodes each bit as a transition direction at the midpoint of its time slot. Bit 1 = rising. Bit 0 = falling.
+#### The question: does Manchester use 2 clock cycles per bit, or does it use both edges of 1 cycle?
+It uses both edges of 1 clock cycle. One bit still takes exactly one clock period. But within that one period, the signal must switch at least once (at the midpoint) and sometimes twice (midpoint + boundary). The wire switches at 2× the rate — not because two full clock cycles are used, but because the signal uses the rising edge AND the falling edge of a single clock cycle as switching points. That is what "2× frequency" means — the wire toggles twice per clock cycle instead of once.
 
-Step 2. The sender may add a boundary transition at the start of a new bit period purely to set the signal to the correct starting level for the next bit's midpoint.
+* Rising edge - Signal Flip
+* Clock High  - Holds the new value
+* Fall edge   - If next bit is same as setted bit, then it will switch transit to opposit of current state, else No transit change
+* Clock Low   - Maintain the stage setted up in Fall edge
 
-Step 3. Receiver watches the wire. Every midpoint transition detected = one bit read. Rising = 1. Falling = 0.
+[Explaination](./res/manchester_1011001_step_by_step.html)
 
-Step 4. Receiver uses each midpoint transition to re-lock its clock. Phase error from the previous bit is corrected immediately.
-
-Step 5. There is no clock drift accumulation. The receiver never loses synchronization as long as data is being transmitted.
+## Protocols used in physical layer
+* Ethernet sjgnalling (NRZ, 4B5B, PAM4)
+* Manchester encoding (10BASE-T)
+* Optical fibre
+* RS-232
+* RS-485

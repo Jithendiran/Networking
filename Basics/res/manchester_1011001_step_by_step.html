@@ -1,0 +1,318 @@
+
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; padding: 12px 0 24px; font-family: var(--font-mono, monospace); background: transparent; color: var(--color-text-primary); font-size: 12px; }
+
+.section-title { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.09em; color: var(--color-text-tertiary); border-bottom: 1px solid var(--color-border-tertiary); padding-bottom: 4px; margin: 0 0 12px; }
+
+svg { display: block; width: 100%; }
+hr { border: none; border-top: 1px solid var(--color-border-tertiary); margin: 16px 0; }
+
+/* ── ANSWER BOX ── */
+.answer-box { background: var(--color-background-secondary); border-left: 3px solid #534AB7; border-radius: 0 8px 8px 0; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; line-height: 1.7; }
+.answer-box strong { color: var(--color-text-primary); font-weight: 500; }
+
+/* ── PHASE LEGEND ── */
+.ph-legend { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 6px; margin-bottom: 16px; }
+.ph-card { border-radius: 6px; padding: 8px 10px; font-size: 11px; line-height: 1.55; }
+.ph-card b { display: block; font-size: 10px; font-weight: 500; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.06em; }
+.ph-low  { background: #F1EFE8; color: #444441; border-left: 3px solid #888780; }
+.ph-rise { background: #EEEDFE; color: #3C3489; border-left: 3px solid #534AB7; }
+.ph-high { background: #E6F1FB; color: #0C447C; border-left: 3px solid #185FA5; }
+.ph-fall { background: #FAECE7; color: #712B13; border-left: 3px solid #993C1D; }
+@media(prefers-color-scheme:dark){
+  .ph-low  { background:#2C2C2A; color:#D3D1C7; }
+  .ph-rise { background:#26215C; color:#CECBF6; }
+  .ph-high { background:#042C53; color:#B5D4F4; }
+  .ph-fall { background:#4A1B0C; color:#F5C4B3; }
+}
+
+/* ── STEP TABLE ── */
+.step-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.step-table th { background: var(--color-background-tertiary); color: var(--color-text-secondary); font-weight: 500; padding: 6px 7px; text-align: left; border-bottom: 1px solid var(--color-border-tertiary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+.step-table td { padding: 5px 7px; border-bottom: 0.5px solid var(--color-border-tertiary); vertical-align: middle; line-height: 1.5; }
+.step-table tr.bit-start td { border-top: 2px solid var(--color-border-secondary); }
+
+.cell-bit { font-weight: 500; font-size: 13px; text-align: center; }
+.cell-bit.b1 { color: #085041; }
+.cell-bit.b0 { color: #791F1F; }
+@media(prefers-color-scheme:dark){ .cell-bit.b1{color:#9FE1CB;} .cell-bit.b0{color:#F09595;} }
+
+.ph-tag { display:inline-block; padding:1px 6px; border-radius:3px; font-size:10px; font-weight:500; white-space:nowrap; }
+.ph-tag.low  { background:#F1EFE8; color:#444441; }
+.ph-tag.rise { background:#EEEDFE; color:#3C3489; }
+.ph-tag.high { background:#E6F1FB; color:#0C447C; }
+.ph-tag.fall { background:#FAECE7; color:#712B13; }
+@media(prefers-color-scheme:dark){
+  .ph-tag.low  { background:#2C2C2A; color:#D3D1C7; }
+  .ph-tag.rise { background:#26215C; color:#CECBF6; }
+  .ph-tag.high { background:#042C53; color:#B5D4F4; }
+  .ph-tag.fall { background:#4A1B0C; color:#F5C4B3; }
+}
+
+.sig-before { color: var(--color-text-secondary); }
+.action-encode { color: #1D9E75; font-weight: 500; }
+.action-hold   { color: var(--color-text-tertiary); }
+.action-setup  { color: #BA7517; font-weight: 500; }
+.sig-after { font-weight: 500; color: var(--color-text-primary); }
+
+.note { font-size: 10.5px; color: var(--color-text-tertiary); line-height: 1.65; margin-top: 4px; }
+</style>
+
+<!-- ANSWER BOX -->
+<div class="answer-box">
+  <strong>Answer — 1 clock cycle per bit, both edges used:</strong><br>
+  One bit = one full clock period (LOW half + rising edge + HIGH half + falling edge).<br>
+  Manchester does NOT use 2 full clock cycles. It uses <em>both the rising and falling edge</em> of a single clock cycle as switch points.<br>
+  That means the wire toggles up to 2× per clock period → wire needs 2× the frequency of NRZ.
+</div>
+
+<!-- PHASE LEGEND -->
+<div class="section-title">What happens at each clock phase (IEEE 802.3 — Bit 1 = L→H, Bit 0 = H→L at midpoint)</div>
+<div class="ph-legend">
+  <div class="ph-card ph-low"><b>— Clock LOW (first half)</b>Signal holds the level set by previous falling edge. Nothing new happens. Receiver waits.</div>
+  <div class="ph-card ph-rise"><b>↑ Rising edge (midpoint)</b>Signal FLIPS. This flip IS the bit. L→H = Bit 1. H→L = Bit 0. Receiver latches here.</div>
+  <div class="ph-card ph-high"><b>— Clock HIGH (second half)</b>Signal holds the level it just flipped to. Nothing new happens.</div>
+  <div class="ph-card ph-fall"><b>↓ Falling edge (boundary)</b>Setup only. Signal moves to the level needed so the NEXT rising-edge flip encodes the next bit correctly. No data here.</div>
+</div>
+
+<!-- WAVEFORM -->
+<div class="section-title">Waveform — data: 1 0 1 1 0 0 1</div>
+<svg id="svg-wave" viewBox="0 0 640 170"></svg>
+<div class="note" id="wave-note"></div>
+
+<hr/>
+
+<!-- STEP TABLE -->
+<div class="section-title">Step-by-step — every clock phase for every bit</div>
+<table class="step-table">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Bit</th>
+      <th>Clock phase</th>
+      <th>Signal before</th>
+      <th>What happens</th>
+      <th>Signal after</th>
+      <th>Why</th>
+    </tr>
+  </thead>
+  <tbody id="step-tbody"></tbody>
+</table>
+
+<script>
+const BITS = [1,0,1,1,0,0,1];
+const N = BITS.length;
+const X0 = 44, XE = 628;
+const SW = (XE - X0) / N;
+const HW = SW / 2;
+
+const CY = 0,  CH = 14, CL = 42;
+const SY = 58, SH = 14, SL = 42;
+
+function ns(t){ return document.createElementNS('http://www.w3.org/2000/svg',t); }
+function line(p,x1,y1,x2,y2,stroke,sw,dash){
+  const l=ns('line');
+  l.setAttribute('x1',x1);l.setAttribute('y1',y1);l.setAttribute('x2',x2);l.setAttribute('y2',y2);
+  l.setAttribute('stroke',stroke);l.setAttribute('stroke-width',sw||1.5);l.setAttribute('stroke-linecap','square');
+  if(dash)l.setAttribute('stroke-dasharray',dash);
+  p.appendChild(l);
+}
+function poly(p,pts,stroke,sw){
+  const pl=ns('polyline');
+  pl.setAttribute('points',pts.map(a=>a.join(',')).join(' '));
+  pl.setAttribute('fill','none');pl.setAttribute('stroke',stroke);
+  pl.setAttribute('stroke-width',sw||2);pl.setAttribute('stroke-linecap','square');
+  p.appendChild(pl);
+}
+function txt(p,x,y,s,fs,fill,anchor){
+  const t=ns('text');
+  t.setAttribute('x',x);t.setAttribute('y',y);
+  t.setAttribute('font-size',fs||11);t.setAttribute('fill',fill||'var(--color-text-secondary)');
+  t.setAttribute('text-anchor',anchor||'middle');
+  t.setAttribute('font-family','var(--font-mono,monospace)');
+  t.textContent=s;p.appendChild(t);
+}
+
+// Build per-bit signal levels
+// IEEE 802.3: Bit 1 = L→H at midpoint, Bit 0 = H→L at midpoint
+// firstHalf: level BEFORE midpoint flip
+//   Bit 1 → must be L before flip (so flip = L→H)
+//   Bit 0 → must be H before flip (so flip = H→L)
+// secondHalf: level AFTER midpoint flip (opposite of firstHalf)
+function buildSegs(bits){
+  const segs=[];
+  let prevSec=null;
+  for(let i=0;i<bits.length;i++){
+    const fh = bits[i]===1 ? SL : SH;  // firstHalf y-level
+    const sh = bits[i]===1 ? SH : SL;  // secondHalf y-level (after flip)
+    const needBound = prevSec!==null && prevSec!==fh;
+    segs.push({fh,sh,needBound,prevSec});
+    prevSec=sh;
+  }
+  return segs;
+}
+
+function drawWave(){
+  const svg=document.getElementById('svg-wave');
+  svg.innerHTML='';
+  const segs=buildSegs(BITS);
+
+  // ── Clock ──
+  const cpts=[];
+  for(let i=0;i<N;i++){
+    const xs=X0+i*SW, xm=xs+HW, xe=xs+SW;
+    if(i===0) cpts.push([xs,CY+CL]);
+    cpts.push([xm,CY+CL]);   // LOW until midpoint
+    cpts.push([xm,CY+CH]);   // ↑ rising
+    cpts.push([xe,CY+CH]);   // HIGH
+    cpts.push([xe,CY+CL]);   // ↓ falling
+  }
+  poly(svg,cpts,'#378ADD',2);
+  txt(svg,X0-4,CY+CH+4,'H',9,'var(--color-text-tertiary)','end');
+  txt(svg,X0-4,CY+CL+4,'L',9,'var(--color-text-tertiary)','end');
+  txt(svg,X0-4,CY+2,'CLK',9,'#185FA5','end');
+
+  // ── Phase markers + bit number labels ──
+  for(let i=0;i<N;i++){
+    const xs=X0+i*SW, xm=xs+HW, xe=xs+SW;
+    // bit number
+    txt(svg,xs+SW/2,CY+CL+16,'bit '+(i+1)+' ('+BITS[i]+')',8.5,'var(--color-text-tertiary)','middle');
+    // slot boundary
+    line(svg,xs,CY+CH,xs,SY+SL+14,'var(--color-border-tertiary)',0.5,'3,2');
+    // rising edge — purple
+    line(svg,xm,CY+CL,xm,SY+SL+14,'#7F77DD',0.9,'3,2');
+    txt(svg,xm,CY+CH-4,'↑',8,'#7F77DD','middle');
+    // falling edge — orange
+    if(i<N-1){
+      line(svg,xe,CY+CH,xe,SY+SL+14,'#993C1D',0.6,'2,3');
+      txt(svg,xe,CY+CH-4,'↓',8,'#993C1D','middle');
+    }
+    // LOW / HIGH phase zone labels
+    txt(svg,xs+HW/2,CY+CL+8,'LOW',7.5,'#888780','middle');
+    txt(svg,xm+HW/2,CY+CH+10,'HIGH',7.5,'#185FA5','middle');
+  }
+
+  // ── Manchester signal ──
+  const spts=[];
+  for(let i=0;i<N;i++){
+    const xs=X0+i*SW, xm=xs+HW, xe=xs+SW;
+    const s=segs[i];
+    if(i===0) spts.push([xs,SY+s.fh]);
+    if(s.needBound){
+      spts.push([xs,SY+s.prevSec]);
+      spts.push([xs,SY+s.fh]);
+    }
+    spts.push([xm,SY+s.fh]);
+    spts.push([xm,SY+s.sh]);
+    spts.push([xe,SY+s.sh]);
+  }
+  poly(svg,spts,'#BA7517',2.5);
+
+  txt(svg,X0-4,SY+SH+4,'H',9,'var(--color-text-tertiary)','end');
+  txt(svg,X0-4,SY+SL+4,'L',9,'var(--color-text-tertiary)','end');
+  txt(svg,X0-4,SY+2,'SIG',9,'#BA7517','end');
+
+  // ── Signal annotations ──
+  for(let i=0;i<N;i++){
+    const xs=X0+i*SW, xm=xs+HW;
+    const s=segs[i];
+    const dir  = BITS[i]===1 ? 'L→H' : 'H→L';
+    const dcol = BITS[i]===1 ? '#1D9E75' : '#E24B4A';
+    // midpoint direction label
+    txt(svg,xm,SY+SL+14,dir,8.5,dcol,'middle');
+    // first-half level
+    txt(svg,xs+HW/2,SY+s.fh-4, s.fh===SH?'H':'L', 8.5,'var(--color-text-tertiary)','middle');
+    // second-half level
+    txt(svg,xm+HW/2,SY+s.sh-4, s.sh===SH?'H':'L', 8.5,'var(--color-text-tertiary)','middle');
+    // boundary setup marker
+    if(s.needBound){
+      txt(svg,xs,SY+SL+14,'setup↓',7.5,'#993C1D','middle');
+    }
+  }
+}
+
+// ── Step table ──
+function buildTable(){
+  const segs=buildSegs(BITS);
+  const tbody=document.getElementById('step-tbody');
+  tbody.innerHTML='';
+
+  for(let i=0;i<N;i++){
+    const s=segs[i];
+    const bit=BITS[i];
+    const fhL = s.fh===14?'H':'L';
+    const shL = s.sh===14?'H':'L';
+    const prevL = s.prevSec===null ? fhL : (s.prevSec===14?'H':'L');
+
+    // Determine next bit's required firstHalf level
+    const nextFH_L = i<N-1 ? (BITS[i+1]===1?'L':'H') : null;
+
+    const phases=[
+      {
+        ph:'LOW', phClass:'low', phLabel:'— Clock LOW (first half)',
+        before: i===0 ? fhL : fhL,
+        action:'HOLD — signal sits at setup level, waits',
+        actionClass:'action-hold',
+        after: fhL,
+        why:'Clock is LOW. No edge event. Receiver waits for rising edge.'
+      },
+      {
+        ph:'RISE', phClass:'rise', phLabel:'↑ Rising edge (midpoint)',
+        before: fhL,
+        action: bit===1 ? 'FLIP: L → H  →  encodes Bit 1' : 'FLIP: H → L  →  encodes Bit 0',
+        actionClass:'action-encode',
+        after: shL,
+        why: bit===1
+          ? 'Bit 1 rule (IEEE 802.3): signal must go L→H at midpoint. Receiver sees L→H = latches 1.'
+          : 'Bit 0 rule (IEEE 802.3): signal must go H→L at midpoint. Receiver sees H→L = latches 0.'
+      },
+      {
+        ph:'HIGH', phClass:'high', phLabel:'— Clock HIGH (second half)',
+        before: shL,
+        action:'HOLD — no change',
+        actionClass:'action-hold',
+        after: shL,
+        why:'Clock HIGH phase. No edge event. Signal holds level after the flip.'
+      },
+      {
+        ph:'FALL', phClass:'fall', phLabel:'↓ Falling edge (boundary)',
+        before: shL,
+        action: i===N-1
+          ? 'HOLD — last bit, no next bit'
+          : nextFH_L===shL
+            ? 'HOLD — already at correct level for next bit ('+nextFH_L+'→'+BITS[i+1]+')'
+            : 'SETUP: '+shL+'→'+nextFH_L+' — reposition for bit '+(i+2)+' ('+BITS[i+1]+')',
+        actionClass: i===N-1
+          ? 'action-hold'
+          : nextFH_L===shL ? 'action-hold' : 'action-setup',
+        after: i===N-1 ? shL : nextFH_L,
+        why: i===N-1
+          ? 'No next bit.'
+          : nextFH_L===shL
+            ? 'Signal already at '+nextFH_L+'. Next bit '+BITS[i+1]+' needs '+nextFH_L+' before its rising edge. No transition needed.'
+            : 'Next bit is '+BITS[i+1]+'. It needs signal at '+nextFH_L+' before its rising edge flip. Transition now so LOW phase holds correct level.'
+      }
+    ];
+
+    phases.forEach((p,pi)=>{
+      const tr=document.createElement('tr');
+      if(pi===0) tr.className='bit-start';
+      const bitCell = pi===0
+        ? `<td rowspan="4" style="text-align:center;font-weight:500;font-size:12px;color:var(--color-text-tertiary)">${i+1}</td>
+           <td rowspan="4" class="cell-bit ${bit===1?'b1':'b0'}">${bit}</td>`
+        : '';
+      tr.innerHTML=`${bitCell}
+        <td><span class="ph-tag ${p.phClass}">${p.phLabel}</span></td>
+        <td class="sig-before">${p.before}</td>
+        <td class="${p.actionClass}">${p.action}</td>
+        <td class="sig-after">${p.after}</td>
+        <td style="color:var(--color-text-tertiary);font-size:10px;line-height:1.5">${p.why}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+}
+
+drawWave();
+buildTable();
+</script>
