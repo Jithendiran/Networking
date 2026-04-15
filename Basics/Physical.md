@@ -121,3 +121,191 @@ It uses both edges of 1 clock cycle. One bit still takes exactly one clock perio
 * Optical fibre
 * RS-232
 * RS-485
+
+## Topology
+A network is a collection of devices connected so they can exchange data. The word topology describes the physical arrangement of those devices and the wires between them — specifically, which devices connect to which, and how many wires exist.
+
+Topology is chosen based on three factors: cost of cabling, fault tolerance (what happens when one wire breaks), and whether devices need to share a wire or have dedicated wires.
+
+**Concept: shared medium vs dedicated link**
+This is the single most important idea behind all topologies. It must be understood first.
+
+* A dedicated link means one wire connects exactly two devices. No other device uses that wire. The full speed of the wire belongs to those two devices at all times.
+
+* A shared medium means one wire connects more than two devices. All those devices use the same wire. When device A sends data, device B, C, and D all see it on the wire too. Only one device can transmit at a time — if two transmit simultaneously, the signals collide and both are destroyed. Rules must exist to prevent this (e.g. CSMA/CD in Ethernet).
+
+All topologies are variations of these two ideas.
+
+
+### 1. Point-to-Point Topology
+
+**What it is**: One wire. Two devices. Nothing else connects to that wire.
+
+**Structure**: `Device A ———— Device B`
+
+**Key property**: The wire is dedicated. There is no sharing, no collision, no need for rules about who transmits when. The full bandwidth of the wire is always available.
+
+**Where it is used**: WAN links between two routers (HDLC runs on these). A direct serial cable between two computers. Leased lines rented from a telecom provider connecting two offices.
+
+**What happens when the wire breaks**: Both devices lose connectivity to each other. There is no alternative path.
+
+### 2. Bus Topology
+
+**What it is**: One long backbone wire runs through the network. Every device connects to this backbone via a short drop cable and a T-shaped connector. The backbone has a terminator cap at each end to absorb signals so they do not reflect back.
+
+**Structure**:
+```
+A     B     C     D     E
+|     |     |     |     |
+|=====|=====|=====|=====|   <--- backbone wire
+```
+
+**Key property**: The backbone is a shared medium. When any device transmits, the signal travels the entire length of the backbone and every other device receives it. Only the device whose address matches accepts it; others ignore it. Only one device can transmit at a time.
+
+**Where it is used**: Early Ethernet installations (10BASE-2, 10BASE-5) from the 1980s and 1990s. Rare today.
+
+**What happens when the wire breaks**: The backbone splits into two isolated segments. The terminators are gone from the break point, causing signal reflections. The entire network stops working.
+
+**Why it is not used today**: One cable failure kills the whole network. Fault isolation is impossible — the broken point can be anywhere along the backbone.
+
+### 3. Star Topology
+
+**What it is**: Every device has its own dedicated wire that connects only to a central device (a switch or hub). No device connects directly to another device.
+
+**Structure**:
+
+```
+        A
+        |
+  D - Switch - B
+        |
+        C
+```
+
+**Key property**: Each wire is a dedicated point-to-point link between one device and the switch. No device shares a wire with any other device. There are no collisions on the wires (in a switch-based star).
+
+**Where it is used**: Every modern Ethernet LAN. Home routers. Office networks. This is the standard today.
+
+**What happens when a wire breaks**: Only the one device on that wire loses connectivity. All other devices are unaffected. This makes faults easy to find and fix.
+
+**Why it replaced bus**: Fault isolation. A broken cable affects one device, not the entire network.
+
+**Important distinction — switch vs hub in a star**:
+
+* A switch gives each device a dedicated link and forwards frames only to the correct destination port. No device sees another device's traffic.
+
+* A hub is electrically the same as a bus — it repeats every signal to every port. All devices still share the medium and need CSMA/CD. Hubs are obsolete.
+
+### 4. Multipoint Topology
+
+**What it is**: Multiple devices connect onto a single shared wire, but unlike bus topology, there are no drop cables or T-connectors — devices tap directly onto the wire at connection points.
+
+**Structure**: `A — B — C — D — E` (all on the same wire, physically touching it)
+
+**Key property**: Shared medium. All devices see all transmissions. Rules (CSMA/CD) are required. This is the general name for any topology where a single wire serves more than two devices.
+
+**Difference from bus topology**:
+
+| | Bus | Multipoint |
+|---|---|---|
+| How devices connect | Drop cables + T-connectors tap off a backbone | Devices connect directly at points along the wire |
+| Terminators | Required at both ends | Not always required |
+| Concept | A specific physical implementation | A general concept describing any shared wire |
+
+Bus topology is one physical implementation of the multipoint concept. Multipoint is the broader category.
+
+### 5. Point-to-Multipoint Topology
+**What it is**: One central device (called the Hub, or Head End) has individual point-to-point links to multiple remote devices (called Spokes or Branches). Each Hub-to-Spoke connection is a dedicated link.
+
+**Structure**:
+```
+        HQ
+       /|\ \
+      / | \ \
+    B1 B2 B3 B4
+```
+
+**Key property**: Each spoke has its own dedicated wire to the hub. However, spoke devices cannot communicate with each other directly — all traffic must go through the hub. Hub-to-spoke is point-to-point. Spoke-to-spoke does not exist as a direct connection.
+
+**Where it is used**: Internet service providers (ISPs) connecting customer premises. Cable TV networks (head end to homes). Satellite networks (ground station to many receivers). Corporate WAN where headquarters connects to branch offices.
+
+**Difference from star topology**:
+
+| | Star | Point-to-Multipoint |
+|---|---|---|
+| Central device role | Switch — forwards between any two devices | Hub/Head-end — controls all communication |
+| Can devices talk to each other | Yes, via the switch | No, all traffic must pass through the hub |
+| Scale | Local area (same building) | Wide area (different cities or countries) |
+| Typical use | LAN | WAN, ISP, satellite |
+
+In a star, device A can send directly to device B through the switch. In point-to-multipoint, branch B1 cannot send to branch B2 without the data going to HQ first, then HQ forwarding it to B2.
+
+### 6. Mesh Topology
+
+**What it is**: Every device has a direct dedicated link to every other device (full mesh), or to multiple but not all other devices (partial mesh).
+
+**Full mesh structure (4 devices = 6 links)**:
+```
+A---B
+|\ /|
+| X |
+|/ \|
+D---C
+```
+
+**Number of links in a full mesh**: For N devices, `the number of links = N × (N−1) ÷ 2`. For 10 devices, that is 45 separate wires.
+
+**Key property**: Every link is point-to-point and dedicated. If any one link fails, data takes an alternative path through other devices. This is called **redundancy**.
+
+**Where it is used**: The core backbone of the internet (routers at major internet exchange points). Data centre interconnects where downtime is unacceptable. Military and critical infrastructure networks.
+
+**What happens when a link breaks**: Routing protocols (like OSPF or BGP) detect the failure and automatically recalculate a path through remaining links. Traffic continues with no manual intervention.
+
+**Why it is not used everywhere**: Cost. N devices need `N×(N−1)÷2` cables and each device needs N−1 network ports. For 100 devices that is 4,950 cables. Only used where the cost of downtime is higher than the cost of cabling.
+
+## The key distinction that separates all of them
+
+There are really only two physical realities: a wire is either shared by many devices, or dedicated to two devices.
+
+- Bus and Multipoint — shared wire, many devices on one cable, collisions possible.
+
+- Point-to-Point, Star (switch), and Mesh — dedicated wires, no sharing, no collisions.
+
+- Point-to-Multipoint — dedicated wires between hub and each spoke, but communication is restricted — spokes cannot reach each other without going through the hub.
+
+- Star topology looks like Point-to-Multipoint when drawn, but the central device in a star (a switch) actively forwards traffic between any two devices. The central device in Point-to-Multipoint does not do this — it only serves as the control point.
+
+
+The central device alone does not determine the topology. What determines it is **how traffic flows between the connected devices**.
+
+
+**The actual rule:**
+
+| Central device | Topology | Reason |
+|---|---|---|
+| Switch | Star | Any device can talk to any other device directly through the switch. Switch just forwards. |
+| Hub | Star (but shared medium) | Same physical shape as star, but hub repeats to all ports — behaves like a bus internally. |
+| Router (LAN side) | Star | Devices connected to router's LAN ports can reach each other. Router forwards between them. |
+| Router (WAN side) | Point-to-Multipoint | Branch offices connect to HQ router. Branches cannot reach each other directly — all traffic goes through HQ router first. |
+
+
+**The same router can be both, depending on which side:**
+
+```
+Branch1 ──┐
+Branch2 ──┤── HQ Router ──── Switch ── PC-A
+Branch3 ──┘                         └── PC-B
+    
+↑ Point-to-Multipoint                ↑ Star
+  (WAN side)                           (LAN side)
+```
+
+**The real difference between Star and Point-to-Multipoint:**
+
+The question to ask is: **can device A talk to device B without the central device making a special decision?**
+
+In a **star with a switch** — yes. Switch just looks up the MAC address and forwards. It does not decide whether the conversation is allowed. Any device reaches any device.
+
+In **Point-to-Multipoint** — no. Branch1 cannot send data to Branch2 directly. The data travels to HQ, and HQ router decides whether and where to forward it. The hub/head-end is a control point, not just a forwarder.
+
+So the topology is defined by **traffic flow rules**, not by the physical shape of the diagram or the type of device at the centre.
