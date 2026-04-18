@@ -198,3 +198,5 @@ If the Coffee Shop moves from London to Paris:
 2. In Paris, the local routers are only looking for 45.20.x.x.
 3. If the shop tries to use its London IP in Paris, the Paris routers will ignore it because it doesn't match the local "Prefix" rules.
 4. Conclusion: The shop must get a new IP address from the Paris ISP. Their old IP is "waste" to them, but the London ISP will immediately give that IP to a new customer in London.
+
+[Classificatio](./Classification.md)

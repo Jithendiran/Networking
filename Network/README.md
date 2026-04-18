@@ -129,3 +129,5 @@ MAC addresses use 48 bits.
 * The Total: Approximately 281 Trillion addresses. 
 
 Key Fact: If every person on Earth owned 35,000 smart devices, the world would still have enough MAC addresses to give every single device a unique ID. Estimated to last until 2100+, so no one focus now, when we at that time, we may have completely different technology
+
+[IP](./IP.md)
