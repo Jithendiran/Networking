@@ -124,6 +124,44 @@ This diagram represents how the 160 bits (20 bytes) are arranged.
 ```
 
 #### Address
+An Internet Protocol version 4 (IPv4) address is a **32-bit binary number**. This number functions as a unique identifier for a device on a network. To make this 32-bit string manageable for hardware and readable for humans, it is organized into a specific hierarchy.
+
+##### 1. The Binary Foundation (The Machine View)
+At the lowest level, an IP address is a continuous sequence of 32 bits. A **bit** is the smallest unit of data, representing either a `0` or a `1`.
+
+* **Structure:** `bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`
+* **Total Combinations:** Because there are 32 positions, there are $2^{32}$ possible unique addresses, totaling **4,294,967,296**.
+
+##### 2. The Octet Division (The Logic View)
+Processing 32 bits as a single block is computationally inefficient for early networking hardware. To simplify management, the 32 bits are divided into four equal segments called **octets**.
+
+* **Definition of an Octet:** A grouping of **8 bits**.
+* **Structure:** `bbbbbbbb.bbbbbbbb.bbbbbbbb.bbbbbbbb`
+* **Logic:** By breaking the address into octets, networking equipment can process the address one byte (8 bits) at a time.
+
+
+##### 3. Dotted Decimal Notation (The Human View)
+Binary strings are difficult for humans to read and remember. Therefore, each 8-bit octet is converted into a decimal number.
+
+* **The Range of an Octet:** * The lowest value is `00000000`, which equals **0**.
+    * The highest value is `11111111`, which equals **255** ($128+64+32+16+8+4+2+1$).
+* **The Format:** The four decimal numbers are separated by periods (dots).
+* **Representation:** `X.X.X.X` (where each `X` is a value from 0 to 255).
+
+##### 4. Summary of Components
+The following table illustrates how a single address is represented across different formats:
+
+| Format | Example Representation |
+| :--- | :--- |
+| **Binary** | `11000000.10101000.00000001.00000001` |
+| **Bit Count** | 8 bits . 8 bits . 8 bits . 8 bits (Total: 32) |
+| **Dotted Decimal** | `192.168.1.1` |
+| **Octet Range** | Each segment ranges from `0` to `255` |
+
+##### The "Why": Precision and Constraint
+The reason an octet cannot exceed **255** is a mathematical constraint of the 8-bit limit. Allowing a number higher than 255 would require a 9th bit, which would break the 32-bit standardized structure of the IPv4 protocol. This rigid mathematical framework ensures that every router in the world interprets the "start" and "end" of an address in the exact same way.
+
+**Summary**: 
 An IPv4 address is exactly 32 bits long. These bits are divided into 4 equal groups called Octets.
 * 1 Octet = 8 bits.
 * Total bits = $8 \times 4 = 32$.
