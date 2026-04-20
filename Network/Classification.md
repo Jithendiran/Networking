@@ -62,6 +62,7 @@ Because the first bit is fixed at `0`, the first octet can only range from `0000
     * **0.x.x.x (Network 0):** Reserved for "this network" or default routing. It cannot be assigned to a physical network.
     * **127.x.x.x (Network 127):** Reserved for **Loopback**. Data sent to any address starting with 127 stays within the local device for software testing.
 * **Usable Networks:** $128 - 2 = 126$. The usable range is **1.x.x.x to 126.x.x.x**.
+    * Check [Reserve](#refined-calculation-of-usable-public-networks) for calculation more detail
 
 #### 3. Host Capacity Logic
 Each Class A network uses $32-8\text{(network)}=24$, 24 bits for host addresses. 
@@ -137,6 +138,7 @@ Because the first two bits are fixed as `1` and `0`, the value of the first octe
 * Binary Range: `10000000` (128) to `10111111` (191).
 * Decimal Range: 128.x.x.x to 191.x.x.x.
 * Total Mathematical Networks: $2^{14} = 16,384$. (Calculated as 14 bits because 2 of the 16 network bits are fixed).
+* Check [Reserve](#refined-calculation-of-usable-public-networks) for calculation more detail
 
 #### 3. Host Capacity Logic
 Class B uses 16 bits for the host portion.
@@ -160,6 +162,7 @@ With the first three bits fixed as `110`, the first octet range is determined as
 * Binary Range: `11000000` (192) to `11011111` (223).
 * Decimal Range: 192.x.x.x to 223.x.x.x.
 * Total Mathematical Networks: $2^{21} = 2,097,152$. (21 bits are variable within the 24-bit network portion).
+* Check [Reserve](#refined-calculation-of-usable-public-networks) for calculation more detail
 
 #### 3. Host Capacity Logic
 Class C uses only 8 bits for the host portion.
@@ -211,6 +214,8 @@ Class D addresses do not represent "hosts." Instead, they represent groups or se
 #### 3. Binary Identification
 * The Binary Rule: The first four bits are fixed as `1110`.
 * Range Calculation: The lowest value is `11100000` (224) and the highest is `11101111` (239).
+
+[ClassD](./classd.md)
 
 ### Class E: Experimental and Reserved
 Class E was set aside by the Internet Engineering Task Force (IETF) for future use, research, and development.
@@ -269,7 +274,7 @@ The APIPA system is designed for emergency or small-office/home-office (SOHO) us
 * Default Gateway Absence: Because there is no central configuration, APIPA does not provide a Default Gateway (the address of the router). Without a gateway, the device has no path to leave its immediate local network.
 
 ### 5. Global use
-While the APIPA range is mathematically a Class B network, it is a universal service available to all devices, regardless of the class they are intended to occupy.
+While the APIPA range is mathematically a Class B network, it is a universal service available to all devices, regardless of the class (A or B or C) they are intended to occupy.
 
 #### 1. The Distinction: Address Ownership vs. Service Access
 To understand why any device can use APIPA, one must distinguish between a device's Permanent Identity and its Emergency Identity.
@@ -279,54 +284,113 @@ To understand why any device can use APIPA, one must distinguish between a devic
 Just as a person living in a small apartment (Class C) and a person living in a large mansion (Class A) both use the same universal emergency phone number, all devices use the same Class B APIPA range when their primary connection fails.
 
 
-### Reserved Ranges Across All Classes
+## IPv4 Comprehensive Address Classification Table
 
-In addition to the private ranges defined by **RFC 1918**, there are other specialized addresses used for specific technical functions.
+This table summarizes the entire IPv4 space, identifying both the standard ranges and every specific reserved block.
 
-| Class | Special/Private Range | Purpose |
-| :--- | :--- | :--- |
-| **Class A** | `0.0.0.0` to `0.255.255.255` | **Software Initialization:** Used by devices before they have an IP. |
-| **Class A** | `10.0.0.0` to `10.255.255.255` | **Private Networking:** Internal use for large organizations. |
-| **Class A** | `127.0.0.0` to `127.255.255.255`| **Loopback:** Internal software testing (the device talking to itself). |
-| **Class B** | `169.254.0.0` to `169.254.255.255`| **APIPA:** Self-assigned address when a DHCP server is missing. |
-| **Class B** | `172.16.0.0` to `172.31.255.255` | **Private Networking:** Internal use for medium organizations. |
-| **Class C** | `192.168.0.0` to `192.168.255.255`| **Private Networking:** Internal use for homes/small offices. |
-| **Class D** | `224.0.0.0` to `239.255.255.255`| **Multicast:** Sending data to a specific group of subscribers. |
-| **Class E** | `240.0.0.0` to `255.255.255.254`| **Experimental:** Reserved for future use or research. |
-| **N/A** | `255.255.255.255` | **All-Ones Broadcast:** Shouting to the immediate local network. |
-
-### Calculation of Usable Public Class A Networks
-When determining how many **publicly routable** Class A networks are available for purchase or assignment on the global internet, the special reserved blocks must be subtracted from the total.
-
-#### 1. Mathematical Total
-Class A is defined by the first bit being **0**. This allows for the first octet to range from **0 to 127**.
-* **Total Bit-Defined Networks:** 128
-
-#### 2. Deductions for Special Functions
-To find the number of networks usable for public internet traffic, three specific blocks are removed:
-1.  **Network 0 (`0.x.x.x`):** Reserved for initialization.
-2.  **Network 10 (`10.x.x.x`):** Reserved for private internal use.
-3.  **Network 127 (`127.x.x.x`):** Reserved for loopback testing.
-
-#### 3. Final Count
-$$128\text{ (Total)} - 3\text{ (Special Blocks)} = 125$$
-
-**Conclusion:** There are **125** usable public Class A networks. These range from **1.x.x.x** to **9.x.x.x** and **11.x.x.x** to **126.x.x.x**. 
-
-*(Note: While 125 networks are available for public use, each of those 125 networks still contains 16,777,214 usable host addresses for individual devices.)*
-
-### Summary of the Classful System
-
-The transition from a flat list to a structured, class-based system allowed the internet to scale during its first two decades. By hard-coding the **Network/Host split** into the first bits of the address, the system achieved high-speed routing with minimal memory requirements.
-
-#### Summary Table of IPv4 Address Space
-
-| Class | First Octet (Decimal) | Default Mask (Binary) | Total Address Percentage |
+| Class | Range | Status | Purpose / Underlying Logic |
 | :--- | :--- | :--- | :--- |
-| **A** | 1 – 126 | 255.0.0.0 | 50% |
-| **B** | 128 – 191 | 255.255.0.0 | 25% |
-| **C** | 192 – 223 | 255.255.255.0 | 12.5% |
-| **D** | 224 – 239 | N/A (Multicast) | 6.25% |
-| **E** | 240 – 255 | N/A (Experimental) | 6.25% |
+| **Class A** | `0.0.0.0/8` | **Reserved** | **Software Initialization:** Placeholder for a device that does not yet have an IP. |
+| **Class A** | `1.0.0.0` – `9.255.255.255` | **Public** | Publicly routable addresses for large organizations. |
+| **Class A** | `10.0.0.0/8` | **Private** | **Internal Networking:** Private use within a single organization; not routable on the Internet. |
+| **Class A** | `11.0.0.0` – `100.63.255.255` | **Public** | Publicly routable addresses for large organizations. |
+| **Class A** | `100.64.0.0/10` | **Reserved** | **Carrier-Grade NAT:** Shared address space for ISPs to manage subscriber networks. |
+| **Class A** | `100.128.0.0` – `126.255.255.255`| **Public** | Publicly routable addresses for large organizations. |
+| **Class A** | `127.0.0.0/8` | **Reserved** | **Loopback:** Internal testing; traffic never leaves the local network interface. |
+|--|--|--|--|
+| **Class B** | `128.0.0.0` – `169.253.255.255`| **Public** | Publicly routable addresses for medium-to-large organizations. |
+| **Class B** | `169.254.0.0/16` | **Reserved** | **APIPA:** Self-assigned local addressing when DHCP fails. |
+| **Class B** | `169.255.0.0` – `172.15.255.255`| **Public** | Publicly routable addresses for medium-to-large organizations. |
+| **Class B** | `172.16.0.0/12` | **Private** | **Internal Networking:** Private use for medium organizations. |
+| **Class B** | `172.32.0.0` – `191.255.255.255`| **Public** | Publicly routable addresses for medium-to-large organizations. |
+|--|--|--|--|
+| **Class C** | `192.0.0.0/24` | **Reserved** | **IETF Protocol Assignments:** Reserved for specific network protocol header use. |
+| **Class C** | `192.0.2.0/24` | **Reserved** | **Documentation (TEST-NET-1):** For use in textbooks and examples. |
+| **Class C** | `192.168.0.0/16` | **Private** | **Internal Networking:** Private use for homes and small offices. |
+| **Class C** | `198.18.0.0/15` | **Reserved** | **Benchmark Testing:** Used for measuring performance between networks. |
+| **Class C** | `198.51.100.0/24` | **Reserved** | **Documentation (TEST-NET-2):** For use in textbooks and examples. |
+| **Class C** | `203.0.113.0/24` | **Reserved** | **Documentation (TEST-NET-3):** For use in textbooks and examples. |
+| **Class C** | All other ranges | **Public** | Publicly routable addresses for small organizations. |
+|--|--|--|--|
+| **Class D** | `224.0.0.0` – `239.255.255.255`| **Reserved** | **Multicast:** One-to-many communication (Streaming, Routing updates). |
+|--|--|--|--|
+| **Class E** | `240.0.0.0` – `255.255.255.254`| **Reserved** | **Experimental:** Reserved for research and future development. |
+| **N/A** | `255.255.255.255` | **Reserved** | **Limited Broadcast:** Targets every host on the immediate local segment. |
+
+
+### Refined Calculation of Usable Public Networks
+
+To ensure the documentation is technically accurate, the deductions must account for every reserved block within the specific bit-boundaries of each Class.
+
+
+### 1. Usable Public Class A Networks
+The calculation for Class A is the most straightforward because the reservations (0, 10, 100, and 127) align cleanly with the 8-bit network boundaries.
+
+#### Deductions:
+1.  **Network 0 (`0.0.0.0/8`):** Software Initialization.
+2.  **Network 10 (`10.0.0.0/8`):** Private Networking.
+3.  **Network 100 (`100.64.0.0/10`):** Shared Address Space (CGNAT). Since a large portion of this block is reserved, the entire "Network 100" is removed from the standard public pool.
+4.  **Network 127 (`127.0.0.0/8`):** Loopback.
+
+#### Final Count:
+$$128\text{ (Total)} - 4\text{ (Special Blocks)} = 124$$
+**Public Range:** 1.0.0.0 – 9.255.255.255, 11.0.0.0 – 99.255.255.255, 101.0.0.0 – 126.255.255.255.
+
+
+### 2. Usable Public Class B Networks
+In Class B, the first two octets define the network. We must identify exactly which 16-bit blocks are reserved.
+
+#### The "17" Deductions Explained:
+To reach the count of 17 reserved networks, the following specific Class B blocks are subtracted from the $16,384$ total:
+
+* **APIPA (1 Network):** 1. `169.254.0.0`
+* **RFC 1918 Private Range (16 Networks):** The range is `172.16.0.0` to `172.31.255.255`. In Class B logic, this is a sequence of 16 individual networks:
+    1. `172.16.0.0`
+    2. `172.17.0.0`
+    3. `172.18.0.0`
+    4. `172.19.0.0`
+    5. `172.20.0.0`
+    6. `172.21.0.0`
+    7. `172.22.0.0`
+    8. `172.23.0.0`
+    9. `172.24.0.0`
+    10. `172.25.0.0`
+    11. `172.26.0.0`
+    12. `172.27.0.0`
+    13. `172.28.0.0`
+    14. `172.29.0.0`
+    15. `172.30.0.0`
+    16. `172.31.0.0`
+
+#### Final Count:
+$$16,384\text{ (Total)} - 17\text{ (Special Networks)} = 16,367$$
+
+
+### 3. Usable Public Class C Networks
+Class C uses 24 bits for the network ID. Deductions here are higher because the private range alone covers a significant number of 24-bit networks.
+
+#### Deductions:
+1.  **Private Range (`192.168.0.0/16`):** This block contains **256** individual Class C networks (from `192.168.0.0` to `192.168.255.0`).
+2.  **Documentation (TEST-NET-1):** `192.0.2.0` (1 Network).
+3.  **IETF Protocol Assignments:** `192.0.0.0` (1 Network).
+4.  **Benchmark Testing:** `198.18.0.0/15`. This block covers **2** Class B-sized spaces, but within the Class C range, it consumes **512** Class C networks (from `198.18.0.0` to `198.19.255.0`).
+5.  **Documentation (TEST-NET-2/3):** `198.51.100.0` and `203.0.113.0` (2 Networks).
+
+#### Final Count:
+$$2,097,152\text{ (Total)} - (256 + 1 + 1 + 512 + 2) = 2,096,380$$
+
+**Note:** The exact number can vary slightly depending on how many specialized protocol blocks (like `192.0.0.0/24`) are strictly excluded from "public" sale by IANA.
+
+
+
+### Summary Table for Final Documentation
+
+| Class | Total Networks | Reserved Networks | Publicly Routable Networks |
+| :--- | :--- | :--- | :--- |
+| **Class A** | 128 | 4 | 124 |
+| **Class B** | 16,384 | 17 | 16,367 |
+| **Class C** | 2,097,152 | ~772 | ~2,096,380 |
+
+**Conclusion:** The transition from the mathematical total to the usable total is necessary because "Publicly Routable" implies the address must be unique and reachable globally. Reserved blocks are excluded to prevent routing conflicts and ensure stability for specialized functions like internal networking and testing.
 
 **Note on Efficiency:** The primary failure of this system was the rigid "split points." An organization needing 300 addresses was too large for Class C (254 hosts) and was forced to take a Class B (65,534 hosts), resulting in 65,234 wasted addresses. This inefficiency eventually necessitated the move to **Classless Inter-Domain Routing (CIDR)**.

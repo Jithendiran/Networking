@@ -238,3 +238,4 @@ If the Coffee Shop moves from London to Paris:
 4. Conclusion: The shop must get a new IP address from the Paris ISP. Their old IP is "waste" to them, but the London ISP will immediately give that IP to a new customer in London.
 
 [Classificatio](./Classification.md)
+[Packet Delivery](./classfull_packet_journey.md)
