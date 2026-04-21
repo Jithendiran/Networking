@@ -393,4 +393,4 @@ $$2,097,152\text{ (Total)} - (256 + 1 + 1 + 512 + 2) = 2,096,380$$
 
 **Conclusion:** The transition from the mathematical total to the usable total is necessary because "Publicly Routable" implies the address must be unique and reachable globally. Reserved blocks are excluded to prevent routing conflicts and ensure stability for specialized functions like internal networking and testing.
 
-**Note on Efficiency:** The primary failure of this system was the rigid "split points." An organization needing 300 addresses was too large for Class C (254 hosts) and was forced to take a Class B (65,534 hosts), resulting in 65,234 wasted addresses. This inefficiency eventually necessitated the move to **Classless Inter-Domain Routing (CIDR)**.
+**Note on Efficiency:** The primary failure of this system was the rigid "split points." An organization needing 300 addresses was too large for Class C (254 hosts) and was forced to take a Class B (65,534 hosts), resulting in 65,234 wasted addresses. This inefficiency eventually necessitated the move to **[Classless Inter-Domain Routing (CIDR)](./classless.md)**.
