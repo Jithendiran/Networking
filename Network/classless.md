@@ -50,7 +50,7 @@ These three conclusions became the design specification for CIDR.
 
 ### How to read classless
 
-The number after the slash tells you exactly how many bits (out of 32) are reserved for the Network ID. The remaining bits are for Hosts (individual devices).
+The number after the slash tells us exactly how many bits (out of 32) are reserved for the Network ID. The remaining bits are for Hosts (individual devices).
 
 #### Step 1: Identify the "Split Point"
 
@@ -61,19 +61,72 @@ The number after the slash tells you exactly how many bits (out of 32) are reser
 
 #### Step 2: Calculate the Block Size
 
-Block Size is the total number of IP addresses contained within a specific network or subnet. This includes the unusable Network Address, the unusable Broadcast Address, and all Usable Host Addresses in between.
+1. Definition of Block Size
 
-To read the range of an address, you must know the Block Size. The logic is based on powers of 2, because computers use binary.
+  Block Size is the total number of IP addresses contained within a specific sub-network (subnet). It represents the mathematical "step" or "increment" between one network address and the next. This value includes the network address, all usable host addresses, and the broadcast address.
 
-$$ Block\ Size = 2^{Host\ Bits} $$
+2. Manual calculation
 
-Using the `/27` example from above:
-* Host bits = 5
-* $2^5 = 32$
-* Block Size = 32 addresses.
+  1. Step A: Determine Bit Allocation
+      * An IPv4 address has 32 bits total.
+      * The prefix /27 dictates that the first 27 bits are locked for the Network.
+      * Remaining bits for the Host: $32 - 27 = 5$ bits.
+  
+  2. Step B: Analyze the Host Octet (The 4th Octet)
+      The first three octets (192.168.1) use 24 bits. The remaining 3 network bits and 5 host bits reside in the fourth octet.
+        - Binary of `.32`: `0 0 1 | 0 0 0 0 0` (The | represents the /27 boundary).
+        - Host Bits: The 5 zeros at the end.
+  
+  3. Step C: Calculate Possible Combinations
+      * Since there are 5 bits reserved for the host, calculate how many different patterns can be made using only those 5 bits:
+        1. 00000 (Decimal 0)
+        2. 00001 (Decimal 1)
+        3. 00010 (Decimal 2) ...and so on, until:
+        4. 11111 (Decimal 31)
+      * By counting every possible variation of those 5 bits, the result is exactly 32. This means the network "block" spans 32 units before the 27th bit (the network part) must change to start a new group.
+
+3. Short hand calculation
+    $$ Block\ Size = 2^{Host\ Bits} $$
+
+    Using the `/27` example from above:
+
+    * Host bits = 5
+    * $2^5 = 32$
+    * Block Size = 32 addresses.
+
+    - The Block Size must account for every possible mathematical state the host bits can enter (in our case for host bit of `5` it can have unique 32bit format).
+    - Since computer hardware processes data in powers of two, the size of a network must always be a power of two ($4, 8, 16, 32, 64, 128, 256$).
+      * Computers do not use the decimal system (Base-10). They operate on Binary (Base-2), where every digit is a "bit" that can only be a 0 or a 1. Because there are only two choices per bit, every time a bit is added to the host portion, the number of possible addresses exactly doubles.
+
+      * To understand why the block size is $2^n$, observe how the total number of unique patterns (addresses) grows as host bits are added:
+        - 1 Host Bit: Can be 0 or 1: Total patterns: 2 ($2^1$)
+        - 2 Host Bits: Can be 00, 01, 10, or 11: Total patterns: 4 ($2^2$)
+        - 3 Host Bits: Can be 000, 001, 010, 011, 100, 101, 110, or 111: Total patterns: 8 ($2^3$)
+
+        Conclusion: The "Block Size" is simply the count of every possible combination those bits can form. If a network has 5 host bits (like in the /27 example), the math dictates there are exactly $2 \times 2 \times 2 \times 2 \times 2 = 32$ unique patterns.
+
 
 #### Step 3: Find the Network Boundaries
-A network must start on a multiple of its own block size. To read where the network starts and ends, you count in increments of that block size starting from `.0`.
+A network must start on a multiple of its own block size (if block size id `32`, then networks can only start at `0`, `32`, `64`, `96`, `128`, `160`, `192`, or `224`). 
+  - This requirement exists because of how the Subnet Mask works. The mask acts like a "lock" that aligns with binary boundaries.
+  - Standardization: If networks could start anywhere (like .35 or .42), routers would have to perform incredibly complex math to find them.
+  - Binary Alignment: Because Block Sizes are powers of two ($8, 16, 32, \text{etc.}$), their starting points in binary always result in all host bits being 0.
+  - Efficiency: By forcing networks to start on multiples, the router only needs to look at the "Network Part" to know exactly where a network begins and ends.
+
+To read where the network starts and ends, we count in increments of that block size starting from `0`
+
+Network Start: Previous block end + 1
+
+Network End: start+(block size -1)
+
+* Network 1: Starts at `.0`, Range: `.0` through `.31`
+* Network 2: Starts at `.32` ($0 + 32$), Range: `.32` through `.63`
+* Network 3: Starts at `.64` ($32 + 32$), Range: `.64` through `.95`
+* Network 4: Starts at `.96` ($64 + 32$), Range: `.96` through `.127`
+
+$$\cdots$$
+
+Now let's find the boundries
 
 The usable count is always the block size minus two.
 $$ Usable\ Hosts = (2^h) - 2 $$
@@ -177,7 +230,7 @@ Under CIDR, organisations subnet these private ranges using any prefix length â€
 
 Within any subnet, regardless of prefix length, the first address (all host bits = 0) is the network address and the last address (all host bits = 1) is the broadcast address. Both remain unusable for device assignment.
 
-In the classless (CIDR) system, a network block can start and end at many different points within an octet. The "all zeros" and "all ones" rule applies to the host bits in binary, not necessarily the decimal number you see.
+In the classless (CIDR) system, a network block can start and end at many different points within an octet. The "all zeros" and "all ones" rule applies to the host bits in binary, not necessarily the decimal number we see.
 
 ```
 Network:   192.168.1.0/26     ->  network address:   192.168.1.0

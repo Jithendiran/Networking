@@ -221,6 +221,46 @@ Network ID: 192.168.1.x
 [192.168.1.255] <--- Broadcast Address (Reserved)
 ```
 
+**Reading format**
+
+Example: `10.0.0.0/8`
+
+1. Fundamental Component Logic
+    An IPv4 address consists of exactly 32 bits. These bits are divided into two functional areas: the Network Part (identifying the group) and the Host Part (identifying the specific device). The purpose of the Subnet Mask or Prefix is to define the exact point where the network identification ends and the host identification begins.
+
+2. Reading the Notation
+    The address 10.0.0.0/8 is expressed in two ways:
+
+    * `Dotted Decimal: 10.0.0.0`
+        - The 32 bits are grouped into four 8-bit sections called octets.
+        - In Classful the host and network are splitted by class
+    * `CIDR Notation: /8`
+        - The "slash" value indicates that the first 8 bits belong to the network.
+        - In CIDR host and network are splitted by  `/n`, `n` indicates network bits
+
+*This docs covers how to identify host and network part in given address*
+
+3. Binary Representation
+    To calculate boundaries, decimal numbers must be converted to binary (base-2).
+
+    * IP Address in Binary: `00001010 . 00000000 . 00000000 . 00000000`
+    * Subnet Mask in Binary: 
+        - The `/8` tells the system to "mask" the first 8 bits with 1s.
+        - `11111111 . 00000000 . 00000000 . 00000000`
+    * Subnet Mask in Decimal: `255.0.0.0`
+
+4. Calculating the Network Address
+
+    The Network Address represents the entire group. It is the very first address in the range.
+
+    * Logic: To find the network address, keep all "network bits" as they are, depends on the mask given (Here mask is 8, so keep the 1st 8bit as it is) and set every "host bit" to 0.
+
+    * Calculation:
+        - Network Bits (First 8): 00001010 (Decimal 10)
+        - Host Bits (Remaining 24): 00000000.00000000.00000000 (Decimal .0.0.0)
+    * Result: The network address is 10.0.0.0
+    
+
 ### How IP route packet
 The world uses a tiered system to prevent "Table Explosion" in routers.
 * Tier 1 (Continental): A major router in New York might only have one rule: "If the address starts with 192 (North America), keep it here. If it starts with 45 (Europe), send it across the ocean cable."
