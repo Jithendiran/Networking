@@ -63,27 +63,28 @@ The number after the slash tells us exactly how many bits (out of 32) are reserv
 
 1. Definition of Block Size
 
-  Block Size is the total number of IP addresses contained within a specific sub-network (subnet). It represents the mathematical "step" or "increment" between one network address and the next. This value includes the network address, all usable host addresses, and the broadcast address.
+    Block Size is the total number of IP addresses contained within a specific sub-network (subnet). It represents the mathematical "step" or "increment" between one network address and the next. This value includes the network address, all usable host addresses, and the broadcast address.
 
 2. Manual calculation
 
-  1. Step A: Determine Bit Allocation
-      * An IPv4 address has 32 bits total.
-      * The prefix /27 dictates that the first 27 bits are locked for the Network.
-      * Remaining bits for the Host: $32 - 27 = 5$ bits.
-  
-  2. Step B: Analyze the Host Octet (The 4th Octet)
-      The first three octets (192.168.1) use 24 bits. The remaining 3 network bits and 5 host bits reside in the fourth octet.
-        - Binary of `.32`: `0 0 1 | 0 0 0 0 0` (The | represents the /27 boundary).
-        - Host Bits: The 5 zeros at the end.
-  
-  3. Step C: Calculate Possible Combinations
-      * Since there are 5 bits reserved for the host, calculate how many different patterns can be made using only those 5 bits:
-        1. 00000 (Decimal 0)
-        2. 00001 (Decimal 1)
-        3. 00010 (Decimal 2) ...and so on, until:
-        4. 11111 (Decimal 31)
-      * By counting every possible variation of those 5 bits, the result is exactly 32. This means the network "block" spans 32 units before the 27th bit (the network part) must change to start a new group.
+    1. Step A: Determine Bit Allocation
+        * An IPv4 address has 32 bits total.
+        * The prefix /27 dictates that the first 27 bits are locked for the Network.
+        * Remaining bits for the Host: $32 - 27 = 5$ bits.
+    
+    2. Step B: Analyze the Host Octet (The 4th Octet)
+        The first three octets (192.168.1) use 24 bits. The remaining 3 network bits and 5 host bits reside in the fourth octet.
+          - Binary of `.32`: `0 0 1 | 0 0 0 0 0` (The | represents the /27 boundary).
+          - Network nits : `0 0 1`, append this with existing 24bit network bits
+          - Host Bits: The 5 zeros at the end.
+    
+    3. Step C: Calculate Possible Combinations
+        * Since there are 5 bits reserved for the host, calculate how many different patterns can be made using only those 5 bits:
+          1. 00000 (Decimal 0)
+          2. 00001 (Decimal 1)
+          3. 00010 (Decimal 2) ...and so on, until:
+          4. 11111 (Decimal 31)
+        * By counting every possible variation of those 5 bits, the result is exactly 32. This means the network "block" spans 32 units before the 27th bit (the network part) must change to start a new group.
 
 3. Short hand calculation
     $$ Block\ Size = 2^{Host\ Bits} $$
@@ -94,10 +95,8 @@ The number after the slash tells us exactly how many bits (out of 32) are reserv
     * $2^5 = 32$
     * Block Size = 32 addresses.
 
-    - The Block Size must account for every possible mathematical state the host bits can enter (in our case for host bit of `5` it can have unique 32bit format).
-    - Since computer hardware processes data in powers of two, the size of a network must always be a power of two ($4, 8, 16, 32, 64, 128, 256$).
-      * Computers do not use the decimal system (Base-10). They operate on Binary (Base-2), where every digit is a "bit" that can only be a 0 or a 1. Because there are only two choices per bit, every time a bit is added to the host portion, the number of possible addresses exactly doubles.
-
+    - The Block Size is determined by the total number of unique mathematical states the remaining host bits (other than network) can represent.
+    - Since computer hardware processes data in powers of two, the size of a network must always be a power of two ($4, 8, 16, 32, 64, 128, 256$). They operate on Binary (Base-2), where every digit is a "bit" that can only be a 0 or a 1. Our example have 5 bits, each bits can represent 2 states `0` or `1`
       * To understand why the block size is $2^n$, observe how the total number of unique patterns (addresses) grows as host bits are added:
         - 1 Host Bit: Can be 0 or 1: Total patterns: 2 ($2^1$)
         - 2 Host Bits: Can be 00, 01, 10, or 11: Total patterns: 4 ($2^2$)
@@ -107,7 +106,7 @@ The number after the slash tells us exactly how many bits (out of 32) are reserv
 
 
 #### Step 3: Find the Network Boundaries
-A network must start on a multiple of its own block size (if block size id `32`, then networks can only start at `0`, `32`, `64`, `96`, `128`, `160`, `192`, or `224`). 
+A network must start on a multiple of its own block size (if block size is `32`, then networks can only start at `0`, `32`, `64`, `96`, `128`, `160`, `192`, or `224`). 
   - This requirement exists because of how the Subnet Mask works. The mask acts like a "lock" that aligns with binary boundaries.
   - Standardization: If networks could start anywhere (like .35 or .42), routers would have to perform incredibly complex math to find them.
   - Binary Alignment: Because Block Sizes are powers of two ($8, 16, 32, \text{etc.}$), their starting points in binary always result in all host bits being 0.
@@ -119,21 +118,26 @@ Network Start: Previous block end + 1
 
 Network End: start+(block size -1)
 
-* Network 1: Starts at `.0`, Range: `.0` through `.31`
-* Network 2: Starts at `.32` ($0 + 32$), Range: `.32` through `.63`
-* Network 3: Starts at `.64` ($32 + 32$), Range: `.64` through `.95`
-* Network 4: Starts at `.96` ($64 + 32$), Range: `.96` through `.127`
+* Network 1: Starts at `.0`, Range: `.0` through `.31` (0 to 31 has 32 unique address)
+* Network 2: Starts at `.32` ($0 + 32$), Range: `.32` through `.63` (32 to 63 has 32 unique address)
+* Network 3: Starts at `.64` ($32 + 32$), Range: `.64` through `.95` (64 to 95 has 32 unique address)
+* Network 4: Starts at `.96` ($64 + 32$), Range: `.96` through `.127` (96 to 127 has 32 unique address)
 
 $$\cdots$$
 
 Now let's find the boundries
 
 The usable count is always the block size minus two.
+
 $$ Usable\ Hosts = (2^h) - 2 $$
 
-**Example: Reading 192.168.1.45/27**
+**Why $-2$ ?**
+
+The very first address in the block is the Network Address (the name of the group), and the very last address is the Broadcast Address (used to speak to everyone at once). Everything sitting between these two points is the Usable Host Range—the actual IP addresses you can assign to computers and routers.
+
+**Example: if we get an address 192.168.1.45/27**
 1. Block Size: 32 (Calculated in Step 2).
-2. Possible Network Starts: .0, .32, .64, .96...
+2. Possible Network Starts: .0, .32, .64, .96... (calculated in step 3)
 3. Locate the Address: The number .45 falls between .32 and .64.
 
 **The "Reading" Results:**
@@ -261,3 +265,27 @@ All other addresses in this range — 255.0.0.0 through 255.255.255.254 — are 
 #### 169.254.0.0/16 link-local — unchanged
 
 Remains reserved for automatic link-local addressing (APIPA). Assigned when no DHCP server is reachable.
+
+
+## [Packet journey](classfull_packet_journey.md)
+
+### 1. The Constant Mechanics
+Regardless of whether a network is Class A (Classful) or a `/27` (Classless), these three core mechanics never change:
+
+* **Encapsulation:** The packet is always wrapped in a MAC address (Layer 2) for the local hop and stripped at the router to reveal the IP (Layer 3).
+* **NAT (Translation):** Private addresses must always be swapped for public addresses to cross the internet. The router does not care if the private address came from a Class A block or a custom CIDR block.
+* **Gateway Forwarding:** If a host determines the destination is "not local," it always sends the packet to the Default Gateway.
+
+### 2. The Only Difference: The Mask Logic
+The difference lies entirely in **Step 4.1 (Destination Network Determination)**.
+
+#### In Classful Networking:
+The device determines the "Network Part" by looking at the **first octet**. 
+* If the IP starts with `10`, the device "assumes" the mask is `255.0.0.0`. 
+* The logic is hard-coded into the protocol based on the address range.
+
+#### In Classless (CIDR) Networking:
+The device cannot assume anything based on the IP address alone. It must look at the **Prefix Length** (the `/number`) provided by the administrator or DHCP.
+* An IP could be `10.0.0.1/24`. 
+* In Classful, this would be a Class A network. 
+* In Classless, the `/24` overrides that logic, telling the device that only the first three octets are the network.

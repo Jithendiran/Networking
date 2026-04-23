@@ -131,3 +131,23 @@ MAC addresses use 48 bits.
 Key Fact: If every person on Earth owned 35,000 smart devices, the world would still have enough MAC addresses to give every single device a unique ID. Estimated to last until 2100+, so no one focus now, when we at that time, we may have completely different technology
 
 [IP](./IP.md)
+
+## Network Fundamentals
+
+### The Network
+* A network is a group of connected devices sharing data via common rules and addresses. 
+* Its main purpose is to allow communication and resource sharing across a broad digital boundary. 
+* In Internet Protocol (IP), the network acts as the largest logical group, using a specific network identifier to help global routers direct traffic to the correct destination.
+
+### The Subnet
+* A subnet is a smaller division within a larger network created to boost performance and security. 
+* By splitting a large network into segments, organizations reduce broadcast traffic (data sent to everyone) and simplify management. 
+* Subnets exist because managing one massive, flat network is inefficient; they allow a single network address to be shared across different departments or locations.
+
+### Comparison: Network vs. Subnet
+A subnet is not identical to a network, though they share the same technical properties. The distinction lies in hierarchy and scope.
+* A network is the "parent" entity that is recognized by the public internet or an external service provider.
+* A subnet is a "child" entity created by an internal administrator for organizational efficiency.
+
+**Implementation within Organizations**
+Within a standard classful framework, the address assigned to an organization by a central authority is the network. Once the organization receives this address (for example, a single Class B address), the internal administrators typically divide that address space into multiple subnets.
