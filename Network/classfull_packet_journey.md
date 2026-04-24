@@ -340,6 +340,7 @@ The destination is on a different network. Device A cannot deliver this packet d
 ### Step 4.2 — ARP Resolution for the Gateway
 
 Device A needs the MAC address of the gateway (`192.168.1.1`) to construct the data link layer frame. Device A checks its ARP cache.
+If Destination IP (`192.168.1.51`) is in local network then ARP is sent to that IP eg (`192.168.1.51`) not to the default gateway
 
 ```
 ARP Cache (Device A):

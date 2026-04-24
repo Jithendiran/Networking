@@ -277,5 +277,82 @@ If the Coffee Shop moves from London to Paris:
 3. If the shop tries to use its London IP in Paris, the Paris routers will ignore it because it doesn't match the local "Prefix" rules.
 4. Conclusion: The shop must get a new IP address from the Paris ISP. Their old IP is "waste" to them, but the London ISP will immediately give that IP to a new customer in London.
 
-[Classificatio](./Classification.md)
+### IP address calssification
+[Classification](./Classification.md)
+
+### Gateway
+A gateway is a device that serves as the exit point from one network to another. In practical terms, it is the IP address that a device sends all traffic to when the destination is not on the same local network.
+
+The word "default" in the term default gateway means: this is the forwarding address used when no more specific route is known. If a device does not know how to reach a destination directly, it hands the packet to the default gateway and trusts that device to handle it further.
+
+The gateway is almost always the router's LAN-side IP address — the address assigned to the router's interface that faces the internal network.
+
+#### The Problem a Gateway Solves
+Every device on a network performs a subnet check before sending any packet. This check answers one binary question: is the destination on my network, or is it somewhere else?
+
+```
+Device IP     : 192.168.1.50
+Subnet Mask   : 255.255.255.0
+Local Network : 192.168.1.0
+```
+The device applies the mask to the destination address:
+
+```
+Destination A : 192.168.1.80
+  192.168.1.80  AND  255.255.255.0  =  192.168.1.0  --> SAME network
+  Action: deliver directly (ARP for MAC, send frame)
+
+Destination B : 203.0.115.8
+  203.0.115.8   AND  255.255.255.0  =  203.0.115.0  --> DIFFERENT network
+  Action: send to gateway
+```
+
+When the destination is on a different network, the device has no direct path. It does not know the topology of the internet. It does not know which routers exist beyond its local segment. It only knows one thing: the address of its gateway. The packet is handed to the gateway, and responsibility for further forwarding passes entirely to that device.
+
+Without a gateway address configured, the device has no instruction for what to do when the destination is remote. The TCP/IP stack discards the packet before it is even sent.
+
+#### How a Device Learns Its Gateway Address
+A gateway address is assigned to a device in one of two ways.
+
+* Via DHCP (automatic):
+The DHCP server includes the gateway address in the OFFER message as part of the standard four-field configuration (IP address, subnet mask, gateway, DNS). The device stores this value in its TCP/IP stack configuration on receipt of the ACKNOWLEDGE message.
+
+* Via manual configuration (static):
+A network administrator directly enters the gateway address into the device's network settings. This is common for servers, printers, and other infrastructure devices whose addresses must not change.
+
+* APIPA — No gateway assigned:
+When a device falls back to APIPA (169.254.x.x), no gateway address is assigned. APIPA is a self-assignment mechanism — there is no server involved, no administrator, and no gateway information available.
+
+####  When the Gateway Is Used
+The gateway is consulted for every packet whose destination fails the local subnet check. This covers all of the following cases:
+
+* Case 1 — Communication with any device on the internet:
+Any public IP address (1.x.x.x through 223.x.x.x, excluding private ranges) is by definition outside the local network. Every such packet is forwarded to the gateway.
+
+* Case 2 — Communication between two different private networks:
+If Device A is on 192.168.1.0 and Device B is on 192.168.2.0, both are private Class C networks but they are different networks. Device A cannot reach Device B directly. The packet goes to the gateway, which routes it to the correct segment.
+
+
+#### When the Gateway Is Not Used (and Not Needed)
+The gateway is bypassed entirely when the destination passes the local subnet check — that is, when the destination IP belongs to the same network as the sender.
+
+```
+Both devices on 192.168.1.0 / 255.255.255.0:
+
+  Device A : 192.168.1.50
+  Device B : 192.168.1.80
+
+  Device A sends to 192.168.1.80:
+    Subnet check: 192.168.1.80 AND 255.255.255.0 = 192.168.1.0 --> SAME network
+    Action: ARP for 192.168.1.80 MAC address, deliver frame directly
+    Gateway: NOT consulted, NOT involved
+```
+
+* Scenario 1 — Two devices on the same network:
+Any two devices sharing the same first three octets (in classful Class A/B/C) communicate directly without involving the gateway at all.
+
+* Scenario 4 — APIPA communication between two devices on the same segment:
+Two devices both operating on 169.254.x.x addresses, both connected to the same physical switch or hub, can communicate directly. No gateway exists in this state, and no gateway is required for this specific local exchange.
+
+
 [Packet Delivery](./classfull_packet_journey.md)
