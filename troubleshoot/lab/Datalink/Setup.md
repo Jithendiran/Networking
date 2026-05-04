@@ -1,5 +1,10 @@
 ## Datalink setup
 
+In this stage, Node A is configured with two network interfaces to separate "Production" traffic from "Management/Internet" traffic.
+
+* `eth0` (Production): Connected to the Multicast Socket (Virtual Hub). This is where the custom protocol development occurs.
+* `eth1` (Management): Connected to the QEMU user (SLIRP) network. This provides internet access to the VM to download tools like `tcpdump` without polluting the experimental `eth0` traffic.
+
 ```bash
 qemu-system-x86_64 -enable-kvm -m 512 \
   -drive file=alpine-virt-3.23.4-x86_64.iso,media=cdrom \
@@ -15,7 +20,7 @@ qemu-system-x86_64 -enable-kvm -m 512 \
 ### Understanding QEMU Serial Options
 New options
 
-```
+```bash
 -serial mon:stdio \
 -serial telnet:localhost:4444,server,nowait \
 ```
@@ -41,7 +46,7 @@ This option creates an additional, network-based communication port:
 *   **Accessibility:** In a headless environment, there is no virtual screen. These options provide the only method to interact with the system.
 
 ### How to enter telnet
-> telnet localhost 4444.
+> `telnet localhost 4444`.
 
 ### How to exit telnet
 The Standard Escape Sequence
@@ -83,7 +88,7 @@ The command in the prompt works without `-serial mon:stdio` because `-nographic`
 
 ## Config
 
-Node B config remain same as [Basic.md](../basic.md)
+Node B config remain same as [Basic.md](../basic.md), execute till IP setup, do not execute `ping` command for node A
 
 ### Node A
 ```bash
@@ -97,7 +102,13 @@ qemu-system-x86_64 -enable-kvm -m 512 \
   -nographic
 ```
 
+#### Download tcpdump
+To download `tcpdump`, need to setup internet access and update repo
+
+**Internet**
+
 Inside `VM`
+
 1. Enable internet interface: `ip link set eth1 up`
 2. Get IP address from DHCP: `udhcpc -i eth1`
 
@@ -118,7 +129,7 @@ localhost:~# ip addr
 ``` 
 `10.0.2.15` is a NAT ip, can access internet but it is not possible to access this IP from outside world without portforwarding
 
-3. Ensure eth1 is fully routed : `setup-interfaces -r`
+3. Ensure eth1 is fully routed : `setup-interfaces -r` (This step required only if internet couldn't access)
 4. The '-1' flag automatically picks the first available mirror: `setup-apkrepos -1`
 5. Reconfig apt list : `echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/main" > /etc/apk/repositories && echo "https://dl-cdn.alpinelinux.org/alpine/v3.23/community" >> /etc/apk/repositories` 
 6. Update internal repo : `apk update`
@@ -150,7 +161,6 @@ localhost:~# ip addr
        valid_lft 86270sec preferred_lft 14270sec
     inet6 fe80::5054:ff:fe12:3403/64 scope link 
        valid_lft forever preferred_lft forever
-localhost:~# setup-interfaces -r
 localhost:~# setup-apkrepos -1
 localhost:~# cat /etc/apk/repositories 
 /media/sr0/apks
@@ -163,6 +173,8 @@ localhost:~#
 localhost:~# apk update
 localhost:~# apk add tcpdump
 ```
+
+**Disable ARP**
 
 8. Disable ARP in `Node B` this has to done before executing `ping` on either of the node, execute this on destination node B `ip link set dev eth0 arp off`
 
