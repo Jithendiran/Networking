@@ -105,4 +105,60 @@ Checks has to done form host
         eth0:    4046      89    0    0    0     0          0         0     1926     0
         ```
         as per the stats physical interaface is healthy
+    - Enable local host port and ping self `ping -c 3 localhost`, if we got the result our system is healthy, no problems with firewall inside our computer
 
+5. **Neighbour status**
+    After ARP sent didn't get reply traffic
+    ```
+    localhost:~# ip neigh show
+    192.168.1.2 dev eth0  used 0/0/0 probes 6 FAILED
+    10.0.2.2 dev eth1 lladdr 52:55:0a:00:02:02 used 0/0/0 probes 4 STALE
+    10.0.2.3 dev eth1 lladdr 52:55:0a:00:02:03 used 0/0/0 probes 4 STALE
+    fe80::2 dev eth1 lladdr 52:56:00:00:00:02 router used 0/0/0 probes 0 STALE
+    localhost:~# 
+
+    ``` 
+    If the status is `REACHABLE`, `STABLE` which is positive sign, but if status is `FAILED` no reply from `Node B`, if status is `INCOMPLETE`, still kernel retrying
+
+##### 2. Why ARP didn't received at receiver side
+Configured `ARP` disable in computer and forgot, after long back we just thinking why receiver system didn't respond, `Node A` is preferctly healthy, what about `Node B`, since it is too long we diabled ARP, obviously disabled arp may not come to our thought first, in this  case how to find the issue step by step in receiver side?
+1. ` ip addr`
+```
+localhost:~# ip addr
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: eth0: <BROADCAST,MULTICAST,NOARP,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether 52:54:00:12:34:02 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.1.2/24 scope global eth0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::5054:ff:fe12:3402/64 scope link 
+       valid_lft forever preferred_lft forever
+
+```
+Here it self `NOARP` is present
+
+2. if incase `NOARP` flag not found in 
+    check procs [Refer](../../proc.md)
+    1. Are packets incrementing in the Receive column? `cat /proc/net/dev`
+        ```
+        localhost:~# cat /proc/net/dev
+        Inter-|   Receive                                                |  Transmit
+        face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+            lo:       0       0    0    0    0     0          0         0        0       0    0    0    0     0       0          0
+        eth0:     252       6    0    0    0     0          0         0      560       8    0    0    0     0       0          0
+        ```
+
+        If Yes (as seen in  output: 6 packets), Layer 1 and the Virtual Wire are functional. The data reached the hardware interface. The physical layer receiving signals
+    2. Are the packets seen in IP stats 
+    ```
+    localhost:~# cat /proc/net/snmp
+    Ip: Forwarding DefaultTTL InReceives InHdrErrors InAddrErrors ForwDatagrams InUnknownProtos InDiscards InDelivers OutRequests OutDiscards OutNoRoutes ReasmTis
+    Ip: 2 64 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+
+    ```
+    InReceives: 0, which indicates IP layer didn't received the traffic
+    So packets received at physical layer but didn't dropped before reaching IP layer (network layer)
+    possible reasons
+    1. Kernel drop
+        - corrupted packets
+    2. firewall block 

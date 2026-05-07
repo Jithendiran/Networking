@@ -247,7 +247,7 @@ qemu-system-x86_64 \
 
 # Setup
 
-## Layer 2 Data Link Laboratory
+## Laboratory
 
 This document serves as a permanent reference for establishing and verifying Layer 2 connectivity between two isolated virtual nodes using QEMU Multicast Networking.
 

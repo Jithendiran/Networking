@@ -118,6 +118,8 @@ This field serves two purposes depending on the version of Ethernet used. In mod
 
 **The Why**: A computer runs many different networking processes at once. Once the hardware accepts a frame, it must know which software "department" to send the data to. Without the EtherType, the operating system would not know if it is looking at an internet packet (IP) or a different type of network traffic.
 
+Refer: [VLAN](./VLAN.md)
+
 #### 6. Data and Pad (46 to 1500 Bytes)
 This is the actual information being transmitted, such as a piece of a website, an email, or a file.
 * Maximum Transmission Unit (MTU): The standard limit is 1500 bytes.
