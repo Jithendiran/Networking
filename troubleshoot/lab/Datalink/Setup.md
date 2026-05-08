@@ -88,8 +88,6 @@ The command in the prompt works without `-serial mon:stdio` because `-nographic`
 
 ## Config
 
-Node B config remain same as [Basic.md](../basic.md), execute till IP setup, do not execute `ping` command for node A
-
 ### Node A
 ```bash
 qemu-system-x86_64 -enable-kvm -m 512 \
@@ -100,9 +98,28 @@ qemu-system-x86_64 -enable-kvm -m 512 \
   -device virtio-net-pci,netdev=n2,mac=52:54:00:12:34:03 \
   -serial mon:stdio -serial telnet:localhost:4444,server,nowait \
   -nographic
+
+$ ip link set eth0 up
+
+$ ip addr add 192.168.1.1/24 dev eth0
 ```
 
-#### Download tcpdump
+### Node B
+```bash
+qemu-system-x86_64 -enable-kvm -m 512 \
+  -drive file=alpine-virt-3.23.4-x86_64.iso,media=cdrom \
+  -netdev socket,id=n1,mcast=230.0.0.1:1234 \
+  -device virtio-net-pci,netdev=n1,mac=52:54:00:12:34:02 \
+  -netdev user,id=n2 \
+  -device virtio-net-pci,netdev=n2,mac=52:54:00:12:34:04 \
+  -serial mon:stdio -serial telnet:localhost:4445,server,nowait \
+  -nographic
+$ ip link set eth0 up
+
+$ ip addr add 192.168.1.2/24 dev eth0
+```
+
+#### Download tcpdump in both the node
 To download `tcpdump`, need to setup internet access and update repo
 
 **Internet**
@@ -137,14 +154,6 @@ localhost:~# ip addr
 
 
 ```bash
-qemu-system-x86_64 -enable-kvm -m 512 \
-  -drive file=alpine-virt-3.23.4-x86_64.iso,media=cdrom \
-  -netdev socket,id=n1,mcast=230.0.0.1:1234 \
-  -device virtio-net-pci,netdev=n1,mac=52:54:00:12:34:01 \
-  -netdev user,id=n2 \ # for internet
-  -device virtio-net-pci,netdev=n2,mac=52:54:00:12:34:03 \       # for internet
-  -serial mon:stdio -serial telnet:localhost:4444,server,nowait \ # for accessing 2nd terminal
-  -nographic
 localhost:~# ip link set eth1 up
 localhost:~# udhcpc -i eth1 # for internet access to download package
 
@@ -174,7 +183,7 @@ localhost:~# apk update
 localhost:~# apk add tcpdump
 ```
 
-**Disable ARP**
+**Disable ARP only on Node B**
 
 8. Disable ARP in `Node B` this has to done before executing `ping` on either of the node, execute this on destination node B `ip link set dev eth0 arp off`
 
