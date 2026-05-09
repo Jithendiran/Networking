@@ -180,7 +180,7 @@ https://dl-cdn.alpinelinux.org/alpine/v3.23/main
 https://dl-cdn.alpinelinux.org/alpine/v3.23/community
 localhost:~# 
 localhost:~# apk update
-localhost:~# apk add tcpdump
+localhost:~# apk add tcpdump nftables
 ```
 
 **Disable ARP only on Node B**
