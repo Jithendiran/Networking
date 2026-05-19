@@ -66,3 +66,7 @@ Tailroom      = end  - tail  (space to append data)
 **Why headroom exists**: When a packet moves down the stack toward the wire, each layer prepends its own header. The Ethernet driver prepends a 14-byte Ethernet header. If there is no headroom, the kernel must reallocate the entire buffer and copy everything. Headroom is pre-allocated space that avoids this reallocation.
 
 **Why tailroom exists**: When a packet needs padding (below the 64-byte Ethernet minimum), zero bytes are appended. Tailroom provides space for this without reallocation.
+
+
+## Ref
+* [sk_buf](https://docs.kernel.org/networking/skbuff.html)

@@ -1,7 +1,7 @@
-// gcc tap.c -o /tmp/tap_reader
+// gcc tap2.c -o /tmp/tap_reader
 /*
 * Author: E.K.Jithendiran
-* Date  : 18.5.2026 
+* Date  : 19.5.2026 
 */
 #include <stdio.h>              // printf() and perror()
 #include <stdlib.h>             // exit()
@@ -16,27 +16,43 @@
 #include <linux/if_tun.h>       // IFF_TAP, TUNSETIFF
 #include <netinet/if_ether.h>   // For ETH_P_ALL and ethhdr
 
+void print_tap_mac(const char *dev) {
+    struct ifreq ifr;
+    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0) { perror("socket"); return; }
+
+    memset(&ifr, 0, sizeof(ifr));
+    strncpy(ifr.ifr_name, dev, IFNAMSIZ);
+
+    if (ioctl(sockfd, SIOCGIFHWADDR, &ifr) < 0) {
+        perror("SIOCGIFHWADDR");
+        close(sockfd);
+        return;
+    }
+
+    unsigned char *mac = (unsigned char *)ifr.ifr_hwaddr.sa_data;
+    printf("%02x:%02x:%02x:%02x:%02x:%02x\n",
+           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+    close(sockfd);
+}
+
 int alloc_tap(char *dev) {
     struct ifreq ifr;
     int fd, err;
 
-    // Open the clone device
     if ((fd = open("/dev/net/tun", O_RDWR)) < 0) {
         perror("Opening /dev/net/tun");
         return fd;
     }
 
     memset(&ifr, 0, sizeof(ifr));
-
-    // IFF_TAP: Ethernet-level frame (Layer 2)
-    // IFF_NO_PI: Don't provide packet information (keeps it raw)
     ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
 
     if (*dev) {
         strncpy(ifr.ifr_name, dev, IFNAMSIZ);
     }
 
-    // Create the device
     if ((err = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0) {
         perror("ioctl(TUNSETIFF)");
         close(fd);
@@ -45,17 +61,20 @@ int alloc_tap(char *dev) {
 
     strcpy(dev, ifr.ifr_name);
 
-    printf("Executing 'ip link set %s up'\n", dev);
-    // ip link up
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0) {
         perror("Socket creation failed");
         return -1;
     }
 
-    memset(&ifr.ifr_flags, 0, sizeof(ifr.ifr_flags));
-    
+    // Read MAC immediately after TUNSETIFF (interface is still DOWN)
+    strncpy(ifr.ifr_name, dev, IFNAMSIZ);
+    printf("MAC after TUNSETIFF (DOWN) : ");
+    print_tap_mac(dev);
+
+
     // Get current flags
+    strncpy(ifr.ifr_name, dev, IFNAMSIZ);
     if (ioctl(sockfd, SIOCGIFFLAGS, &ifr) < 0) {
         perror("SIOCGIFFLAGS");
         close(sockfd);
@@ -68,8 +87,14 @@ int alloc_tap(char *dev) {
         close(sockfd);
         return -1;
     }
-    close(sockfd);
 
+    // Read MAC after SIOCSIFFLAGS (interface is now UP)
+    strncpy(ifr.ifr_name, dev, IFNAMSIZ);
+    printf("MAC after SIOCSIFFLAGS (UP): ");
+    print_tap_mac(dev);
+
+
+    close(sockfd);
     return fd;
 }
 
@@ -79,22 +104,16 @@ int main() {
 
     if (tap_fd < 0) return 1;
 
-    printf("Successfully opened %s.\n", dev_name);
+    printf("Successfully opened %s.\n\n", dev_name);
 
     unsigned char buffer[2048];
     while (1) {
-        /*
-        If no packets arrived, program will be paused, it won't move to next line of code
-        CPU won't execute till packet arrives
-        */
         ssize_t nread = read(tap_fd, buffer, sizeof(buffer));
-        // +ve bytes received, 0 End Of File, -1 error occured
         if (nread < 0) {
             perror("Read error");
             break;
         }
 
-        // The first part of the buffer is the Ethernet header
         struct ethhdr *eth = (struct ethhdr *)buffer;
 
         printf("Frame: Dest %02x:%02x:%02x:%02x:%02x:%02x | ",
@@ -105,47 +124,54 @@ int main() {
                eth->h_source[0], eth->h_source[1], eth->h_source[2],
                eth->h_source[3], eth->h_source[4], eth->h_source[5]);
 
-        // Protocol type (e.g., 0x0800 for IPv4)
         printf("Type 0x%04x\n", ntohs(eth->h_proto));
     }
 
     close(tap_fd);
     return 0;
 }
-
 /*
-Executing 'ip link set tap0 up'
-Successfully opened tap0.
-Frame: Dest 33:33:00:00:00:16 | Src 42:f4:50:5a:2e:a3 | Type 0x86dd
-Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:ff:5a:2e:a3 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Terminal 1 
+$ ip monitor link
+13: tap0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default 
+    link/ether fe:99:7c:a5:ff:dd brd ff:ff:ff:ff:ff:ff
+13: tap0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UNKNOWN group default 
+    link/ether fe:99:7c:a5:ff:dd brd ff:ff:ff:ff:ff:ff
+13: tap0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UNKNOWN group default 
+    link/ether 46:f7:6f:38:72:ea brd ff:ff:ff:ff:ff:ff
 
-0x86dd -> IPv6
-MAC address starting with 33:33 are not physical device. They are IPv6 Multicast MAC addresses.
-Now i'm decided not to dig more on mac address 33:33:*
+Terminal 2
+$ sudo ./tap_reader 
+MAC after TUNSETIFF (DOWN) : fe:99:7c:a5:ff:dd
+MAC after SIOCSIFFLAGS (UP): fe:99:7c:a5:ff:dd
+Successfully opened tap0.
+
+Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:ff:a5:ff:dd | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
+Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
 
 */
