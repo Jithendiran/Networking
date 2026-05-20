@@ -16,6 +16,16 @@
 #include <linux/if_tun.h>       // IFF_TAP, TUNSETIFF
 #include <netinet/if_ether.h>   // For ETH_P_ALL and ethhdr
 
+inline static const char* eproto_name(uint16_t type){
+    switch (type)
+    {
+        case 0x0800: return "IPv4";
+        case 0x0806: return "ARP";
+        case 0x86dd: return "IPv6";
+        default: return "Unknown";
+    }
+}
+
 void print_tap_mac(const char *dev) {
     struct ifreq ifr;
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -115,6 +125,8 @@ int main() {
         }
 
         struct ethhdr *eth = (struct ethhdr *)buffer;
+        unsigned short proto = ntohs(eth->h_proto);
+
 
         printf("Frame: Dest %02x:%02x:%02x:%02x:%02x:%02x | ",
                eth->h_dest[0], eth->h_dest[1], eth->h_dest[2],
@@ -124,7 +136,7 @@ int main() {
                eth->h_source[0], eth->h_source[1], eth->h_source[2],
                eth->h_source[3], eth->h_source[4], eth->h_source[5]);
 
-        printf("Type 0x%04x\n", ntohs(eth->h_proto));
+        printf("Type %s (0x%04x)\n", eproto_name(proto), proto);
     }
 
     close(tap_fd);
@@ -133,45 +145,38 @@ int main() {
 /*
 Terminal 1 
 $ ip monitor link
-13: tap0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default 
-    link/ether fe:99:7c:a5:ff:dd brd ff:ff:ff:ff:ff:ff
-13: tap0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UNKNOWN group default 
-    link/ether fe:99:7c:a5:ff:dd brd ff:ff:ff:ff:ff:ff
-13: tap0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UNKNOWN group default 
+5: tap0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default 
+    link/ether 12:91:c5:b4:5d:6e brd ff:ff:ff:ff:ff:ff
+5: tap0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UNKNOWN group default 
+    link/ether 12:91:c5:b4:5d:6e brd ff:ff:ff:ff:ff:ff
+5: tap0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UNKNOWN group default 
     link/ether 46:f7:6f:38:72:ea brd ff:ff:ff:ff:ff:ff
+5: tap0: <BROADCAST,MULTICAST> mtu 1500 qdisc pfifo_fast state DOWN group default 
+    link/ether 46:f7:6f:38:72:ea brd ff:ff:ff:ff:ff:ff
+Deleted 5: tap0: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN group default 
+    link/ether 46:f7:6f:38:72:ea brd ff:ff:ff:ff:ff:ff
+^C
 
 Terminal 2
 $ sudo ./tap_reader 
-MAC after TUNSETIFF (DOWN) : fe:99:7c:a5:ff:dd
-MAC after SIOCSIFFLAGS (UP): fe:99:7c:a5:ff:dd
+MAC after TUNSETIFF (DOWN) : 12:91:c5:b4:5d:6e
+MAC after SIOCSIFFLAGS (UP): 12:91:c5:b4:5d:6e
 Successfully opened tap0.
 
-Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:ff:a5:ff:dd | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-
+Frame: Dest 33:33:00:00:00:16 | Src 12:91:c5:b4:5d:6e | Type IPv6 (0x86dd)
+Frame: Dest 33:33:ff:b4:5d:6e | Src 46:f7:6f:38:72:ea | Type IPv6 (0x86dd)
+Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type IPv6 (0x86dd)
+Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type IPv6 (0x86dd)
+Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type IPv6 (0x86dd)
+Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type IPv6 (0x86dd)
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type IPv6 (0x86dd)
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type IPv6 (0x86dd)
+Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type IPv6 (0x86dd)
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type IPv6 (0x86dd)
+Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type IPv6 (0x86dd)
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type IPv6 (0x86dd)
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type IPv6 (0x86dd)
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type IPv6 (0x86dd)
+Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type IPv6 (0x86dd)
+^C
 */
