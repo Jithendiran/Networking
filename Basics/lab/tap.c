@@ -149,3 +149,98 @@ MAC address starting with 33:33 are not physical device. They are IPv6 Multicast
 Now i'm decided not to dig more on mac address 33:33:*
 
 */
+
+//-----------
+/*
+What i need?
+1. i need to activate bring a new interface for networking
+2. make it active
+3. receive the traffic in that port and log them
+
+i have no idea what is networking interface's low level stuff
+how to config the interface 
+
+let's do a man search on the word "network" in overall man
+why network is the better at searching than internet because network is generic term 
+
+How to use man
+man categories useful 
+2. System Calls "open,read,.."
+3. Library calls "printf,"
+4. device specific file "null, zero, tty"
+7. Miscellaneous 
+
+search `man -k network`
+interfaces (5)       - network interface configuration for ifup and ifdown
+ifconfig (8)         - configure a network interface
+ifdown (8)           - take a network interface down
+ifup (8)             - bring a network interface up
+ip (8)               - show / manipulate routing, network devices, interfaces and tunnels
+ip-link (8)          - network device configuration
+ip-netconf (8)       - network configuration monitoring
+ip-netns (8)         - process network namespace management
+netconfig (5)        - network configuration data base
+netdevice (7)        - low-level access to Linux network devices
+
+These are the manuals i filtered from `man -k`
+in these i need to create a new interface from c programming 
+there is no manual page in category 2,3,4. so take the closest match
+so `interfaces (5)`, `ip-netns (8)`, `netdevice (7)` are shortlisted
+
+search each and skim for how to bring new interface 
+1. interfaces (5), ip-netns (8) seems like command line config, go next
+2. netdevice (7) this promissing, it defines strructure and include files, go head and read for how to bring a device
+
+name - ifreq.ifr_name[IFNAMSIZ]
+Ioctls
+    SIOCGIFFLAGS - this is getter
+        ^
+    SIOCSIFFLAGS - this is setter
+        ^
+    this has to set using ifreq.ifr_flags
+        IFF_UP
+    --------------
+    SIOCSIFNAME -  Changes the name of the interface specified in ifr_name to ifr_newname.  This is a privileged operation.  It is allowed  only  when the interface is not up
+
+ man -k ioctl
+ioctl (2)            - control device
+ #include <sys/ioctl.h>
+ int ioctl(int fd, unsigned long op, ...);
+It required file descriptor, so we should open a device
+
+now tap device
+
+man -k tap
+devlink-dpipe (8)    - devlink dataplane pipeline visualization
+mt (1)               - control magnetic tape drive operation
+mt-gnu (1)           - control magnetic tape drive operation
+prove (1)            - Run tests through a TAP harness.
+rmt (8)              - remote magnetic tape server
+rmt-tar (8)          - remote magnetic tape server
+slick-greeter-enable-tap-to-click (1) - enable tap-to-click
+smbtar (1)           - shell script for backing up SMB/CIFS shares directly to UNIX tape drives
+st (4)               - SCSI tape device
+tc-taprio (8)        - Time Aware Priority Shaper
+twistd3 (1)          - run Twisted applications (TACs, TAPs)
+
+nothing 
+
+$ man -k "virtual device"  
+virtual device: nothing appropriate.
+$ man -k "virtual network"  
+systemd.netdev (5)   - Virtual Network Device configuration
+*/
+
+#include <stdio.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <string.h>
+
+const char* name = "jtap"; 
+int main() {
+    struct ifreq jtap;
+    strcpy(jtap.ifr_name, name);
+
+    // now bring the device up
+
+}
