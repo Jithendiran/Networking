@@ -233,14 +233,46 @@ systemd.netdev (5)   - Virtual Network Device configuration
 
 #include <stdio.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
 #include <net/if.h>
 #include <string.h>
+#include <fcntl.h>
+#include <error.h>
+#include <errno.h>
 
 const char* name = "jtap"; 
 int main() {
     struct ifreq jtap;
+
     strcpy(jtap.ifr_name, name);
+    memset(&jtap, 0, sizeof(jtap));
 
     // now bring the device up
+    /*
+    1. i didn't get any help in man page
+    2. so searched find /usr/include/ -iname **tun**
+        /usr/include/linux/if_tun.h
+        /usr/include/linux/if_tunnel.h
+    3. grep -r "TAP" /usr/include/linux/if_tun.h : has some reference
+    4. /usr/include/linux/if_tun.h  even inside i don't know how to bring up new interface
+    5. searched google "tap driver kernel" -> https://docs.kernel.org/networking/tuntap.html
+    6. Got the reference 
+    */
 
+    int fd, err;
+
+    if( (fd = open("/dev/net/tun", O_RDWR)) < 0 )
+        perror("open tun");
+
+    // now set the dev
+    // SIOCSIFFLAGS with IFF_UP 
+    if (ioctl(fd, SIOCSIFFLAGS, &jtap) < 0){
+        close(fd);
+        perror("ioctl");
+        error(fd, errno, "%s", "Error");
+        return 1;
+    }
+
+    close(fd);
+    while(1);
 }
