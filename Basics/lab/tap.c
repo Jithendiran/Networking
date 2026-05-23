@@ -156,123 +156,167 @@ What i need?
 1. i need to activate bring a new interface for networking
 2. make it active
 3. receive the traffic in that port and log them
+task open a new TAP interface
 
-i have no idea what is networking interface's low level stuff
-how to config the interface 
+find TAP related resources 
+1. man -k TUP : useless
+2. find /usr/include -iname **TUN**
+    /usr/include/linux/if_tun.h - InterFace TUNnel
+3. grep -r "TUN" /usr/include/linux 
+    /usr/include/linux/if_tun.h:#define IFF_TAP             0x0002    
+4. device search
+    find /dev -iname tun:/dev/net/tun
+5. Now find the appropriate data structure
+    1. grep -r TUNSETIFF /usr/include/linux/if_tun.h
+    #define TUNSETIFF     _IOW('T', 202, int) 
+    says int, how would we name inside int, it feels like wrong, this is not the correct structure
 
-let's do a man search on the word "network" in overall man
-why network is the better at searching than internet because network is generic term 
+    2. check for include chain the file and look for any hint
+    grep -r include /usr/include/linux/if_tun.h
+    everything here is raw type so no use
 
-How to use man
-man categories useful 
-2. System Calls "open,read,.."
-3. Library calls "printf,"
-4. device specific file "null, zero, tty"
-7. Miscellaneous 
+    3. see the header file name it is if_tun.h, here tun is the device what is the if means, it is interface
+    grep -r -E 'struct if\w*\b' /usr/include/
 
-search `man -k network`
-interfaces (5)       - network interface configuration for ifup and ifdown
-ifconfig (8)         - configure a network interface
-ifdown (8)           - take a network interface down
-ifup (8)             - bring a network interface up
-ip (8)               - show / manipulate routing, network devices, interfaces and tunnels
-ip-link (8)          - network device configuration
-ip-netconf (8)       - network configuration monitoring
-ip-netns (8)         - process network namespace management
-netconfig (5)        - network configuration data base
-netdevice (7)        - low-level access to Linux network devices
+    now we have `/usr/include/linux/if.h` take a look inside
+    ifreq has name 
 
-These are the manuals i filtered from `man -k`
-in these i need to create a new interface from c programming 
-there is no manual page in category 2,3,4. so take the closest match
-so `interfaces (5)`, `ip-netns (8)`, `netdevice (7)` are shortlisted
+(alternate way)
+5. we know tap is a network device, so search for 
+    `man -k network -s 2,3,7` look for (2   System calls, 3   Library calls, 7   Miscellaneous) read the one line description
+    short listed
+    if_freenameindex (3) - get network interface names and indexes
+    if_indextoname (3)   - mappings between network interface names and indexes
+    netdevice (7)        - low-level access to Linux network devices
+    check each
+    if_freenameindex/if_indextoname is only getter 
 
-search each and skim for how to bring new interface 
-1. interfaces (5), ip-netns (8) seems like command line config, go next
-2. netdevice (7) this promissing, it defines strructure and include files, go head and read for how to bring a device
 
-name - ifreq.ifr_name[IFNAMSIZ]
-Ioctls
-    SIOCGIFFLAGS - this is getter
-        ^
-    SIOCSIFFLAGS - this is setter
-        ^
-    this has to set using ifreq.ifr_flags
-        IFF_UP
-    --------------
-    SIOCSIFNAME -  Changes the name of the interface specified in ifr_name to ifr_newname.  This is a privileged operation.  It is allowed  only  when the interface is not up
-
- man -k ioctl
-ioctl (2)            - control device
- #include <sys/ioctl.h>
- int ioctl(int fd, unsigned long op, ...);
-It required file descriptor, so we should open a device
-
-now tap device
-
-man -k tap
-devlink-dpipe (8)    - devlink dataplane pipeline visualization
-mt (1)               - control magnetic tape drive operation
-mt-gnu (1)           - control magnetic tape drive operation
-prove (1)            - Run tests through a TAP harness.
-rmt (8)              - remote magnetic tape server
-rmt-tar (8)          - remote magnetic tape server
-slick-greeter-enable-tap-to-click (1) - enable tap-to-click
-smbtar (1)           - shell script for backing up SMB/CIFS shares directly to UNIX tape drives
-st (4)               - SCSI tape device
-tc-taprio (8)        - Time Aware Priority Shaper
-twistd3 (1)          - run Twisted applications (TACs, TAPs)
-
-nothing 
-
-$ man -k "virtual device"  
-virtual device: nothing appropriate.
-$ man -k "virtual network"  
-systemd.netdev (5)   - Virtual Network Device configuration
+    `man netdevice` is promissing found the `ifreq`
 */
 
+/*
+Task : Open a virtual NIC device with name jitap 
+*/
 #include <stdio.h>
-#include <sys/ioctl.h>
-#include <unistd.h>
-#include <net/if.h>
-#include <string.h>
 #include <fcntl.h>
-#include <error.h>
 #include <errno.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <linux/if_tun.h>
+#include <string.h>
 
-const char* name = "jtap"; 
-int main() {
-    struct ifreq jtap;
-
-    strcpy(jtap.ifr_name, name);
-    memset(&jtap, 0, sizeof(jtap));
-
-    // now bring the device up
+static const char * name = "jitap"; 
+int main(){
     /*
-    1. i didn't get any help in man page
-    2. so searched find /usr/include/ -iname **tun**
-        /usr/include/linux/if_tun.h
-        /usr/include/linux/if_tunnel.h
-    3. grep -r "TAP" /usr/include/linux/if_tun.h : has some reference
-    4. /usr/include/linux/if_tun.h  even inside i don't know how to bring up new interface
-    5. searched google "tap driver kernel" -> https://docs.kernel.org/networking/tuntap.html
-    6. Got the reference 
+    TUN/TAP is the virtual device, this has to known
+
+    find the related resource
+    1.  man -k 'TUP|TAP' | grep -E "network|interface" : useless
+    2. find /usr/include -type f \( -iname "*tun*" -o -iname "*tap*" \) or  grep -rE "TUN|TAP" /usr/include/
+        Found use full /usr/include/linux/if_tun.h - InterFace TUNnel
+    3. device search
+         find /dev  -type c \( -iname "tun" -o -iname "tap" \): /dev/net/tun
     */
+    int fd = open("/dev/net/tun", O_RDWR);
 
-    int fd, err;
-
-    if( (fd = open("/dev/net/tun", O_RDWR)) < 0 )
-        perror("open tun");
-
-    // now set the dev
-    // SIOCSIFFLAGS with IFF_UP 
-    if (ioctl(fd, SIOCSIFFLAGS, &jtap) < 0){
-        close(fd);
-        perror("ioctl");
-        error(fd, errno, "%s", "Error");
-        return 1;
+    /*
+    1. man open
+    it says error in errno
+    so check for 
+    2. man errno
+    3. err(3), error(3), perror(3), strerror(3)
+    */
+    if(fd < 0) {
+        perror("open TUN");
     }
 
-    close(fd);
-    while(1);
+    /*
+    Now need to set the name to config the device need to do the ioctl
+
+    man ioctl
+
+    Now we need the parameter
+    1. fd
+    2. Flag
+        1. grep -ir set /usr/include/linux/if_tun.h
+            Know the linux convention 
+                1. IF -> InterFace
+                2. IFF -> InterFace Flag 
+                TUNSETIFF -> TUN -> device SET -> set IFF -> InterFace Flag 
+                _IOW means IO Write
+            #define TUNSETIFF     _IOW('T', 202, int) 
+    3. Data structure
+        #define TUNSETIFF     _IOW('T', 202, int) 
+            says int, how would  name inside int, it feels like wrong, this is not the correct structure
+        
+        Method 1. 
+            1. check for include chain the file and look for any hint
+                grep -r include /usr/include/linux/if_tun.h
+                    everything here is raw type so no use
+            2. see the header file name it is if_tun.h, here tun is the device what is the if means, it is interface
+                grep -r -E 'struct if\w*\b' /usr/include/
+                
+                now we have `/usr/include/linux/if.h` take a look inside
+                ifreq has name 
+        Method 2.
+            we know tap is a network device, so search for 
+        `man -k network -s 2,3,7` look for (2   System calls, 3   Library calls, 7   Miscellaneous) read the one line description
+        short listed
+        if_freenameindex (3) - get network interface names and indexes
+        if_indextoname (3)   - mappings between network interface names and indexes
+        netdevice (7)        - low-level access to Linux network devices
+        check each
+        if_freenameindex/if_indextoname is only getter 
+
+
+        `man netdevice` is promissing found the `ifreq`
+        
+    */
+
+    struct ifreq interface;
+    memset(&interface, 0, sizeof(struct ifreq));
+
+    strcpy(interface.ifr_name, name);
+    
+    /*
+    man ioctl
+    */
+    // int res = ioctl(fd, TUNSETIFF, &interface);
+    // if(res < 0) {
+    //     perror("interface config");
+
+    // }
+    // interface config: Invalid argument
+
+    // re-read both /usr/include/linux/if_tun.h and man netdevice
+    /*
+    if_tun's IFflags only support int, but we passed `struct ifreq`
+
+    in /usr/include/linux/if_tun.h  read the config section for TUNSETIFF, it supports 4 flags TU, TAP, NAPI and NAPI_FRAGS, we need TAP
+    */
+    // int res = ioctl(fd, TUNSETIFF, IFF_TAP);
+    // if(res < 0) {
+    //     perror("interface config");
+
+    // }
+    // interface config: Bad address
+
+    /*
+    read the /usr/include/linux/if.h 's ifreq or man netdevice
+    there is a ifru_flags
+    */
+    interface.ifr_flags = IFF_TAP;
+    int res = ioctl(fd, TUNSETIFF, &interface);
+    if(res < 0) {
+        perror("interface config");
+
+    }
+    while (1){}
+    return 0;
+
+    /*
+    4: jitap: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
+    link/ether 32:00:05:9d:7d:4a brd ff:ff:ff:ff:ff:ff
+    */
 }
