@@ -2,200 +2,7 @@
 /*
 * Author: E.K.Jithendiran
 * Date  : 18.5.2026 
-*/
-#include <stdio.h>              // printf() and perror()
-#include <stdlib.h>             // exit()
-#include <string.h>             // memset() and strncpy().
-#include <unistd.h>             // read() and close()
-#include <fcntl.h>              // O_RDWR
-#include <linux/if.h>           // ifreq
-#include <arpa/inet.h>          // ntohs
-#include <sys/ioctl.h>          // ioctl
-#include <sys/types.h>          // ssize_t, pid
-#include <sys/socket.h>         // SIOCGIFFLAGS
-#include <linux/if_tun.h>       // IFF_TAP, TUNSETIFF
-#include <netinet/if_ether.h>   // For ETH_P_ALL and ethhdr
-
-int alloc_tap(char *dev) {
-    struct ifreq ifr;
-    int fd, err;
-
-    // Open the clone device
-    if ((fd = open("/dev/net/tun", O_RDWR)) < 0) {
-        perror("Opening /dev/net/tun");
-        return fd;
-    }
-
-    memset(&ifr, 0, sizeof(ifr));
-
-    // IFF_TAP: Ethernet-level frame (Layer 2)
-    // IFF_NO_PI: Don't provide packet information (keeps it raw)
-    ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
-
-    if (*dev) {
-        strncpy(ifr.ifr_name, dev, IFNAMSIZ);
-    }
-
-    // Create the device
-    if ((err = ioctl(fd, TUNSETIFF, (void *)&ifr)) < 0) {
-        perror("ioctl(TUNSETIFF)");
-        close(fd);
-        return err;
-    }
-
-    strcpy(dev, ifr.ifr_name);
-
-    printf("Executing 'ip link set %s up'\n", dev);
-    // ip link up
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
-        perror("Socket creation failed");
-        return -1;
-    }
-
-    memset(&ifr.ifr_flags, 0, sizeof(ifr.ifr_flags));
-    
-    // Get current flags
-    if (ioctl(sockfd, SIOCGIFFLAGS, &ifr) < 0) {
-        perror("SIOCGIFFLAGS");
-        close(sockfd);
-        return -1;
-    }
-
-    ifr.ifr_flags |= (IFF_UP | IFF_RUNNING);
-    if (ioctl(sockfd, SIOCSIFFLAGS, &ifr) < 0) {
-        perror("SIOCSIFFLAGS (Set Interface Up)");
-        close(sockfd);
-        return -1;
-    }
-    close(sockfd);
-
-    return fd;
-}
-
-int main() {
-    char dev_name[IFNAMSIZ] = "tap0";
-    int tap_fd = alloc_tap(dev_name);
-
-    if (tap_fd < 0) return 1;
-
-    printf("Successfully opened %s.\n", dev_name);
-
-    unsigned char buffer[2048];
-    while (1) {
-        /*
-        If no packets arrived, program will be paused, it won't move to next line of code
-        CPU won't execute till packet arrives
-        */
-        ssize_t nread = read(tap_fd, buffer, sizeof(buffer));
-        // +ve bytes received, 0 End Of File, -1 error occured
-        if (nread < 0) {
-            perror("Read error");
-            break;
-        }
-
-        // The first part of the buffer is the Ethernet header
-        struct ethhdr *eth = (struct ethhdr *)buffer;
-
-        printf("Frame: Dest %02x:%02x:%02x:%02x:%02x:%02x | ",
-               eth->h_dest[0], eth->h_dest[1], eth->h_dest[2],
-               eth->h_dest[3], eth->h_dest[4], eth->h_dest[5]);
-
-        printf("Src %02x:%02x:%02x:%02x:%02x:%02x | ",
-               eth->h_source[0], eth->h_source[1], eth->h_source[2],
-               eth->h_source[3], eth->h_source[4], eth->h_source[5]);
-
-        // Protocol type (e.g., 0x0800 for IPv4)
-        printf("Type 0x%04x\n", ntohs(eth->h_proto));
-    }
-
-    close(tap_fd);
-    return 0;
-}
-
-/*
-Executing 'ip link set tap0 up'
-Successfully opened tap0.
-Frame: Dest 33:33:00:00:00:16 | Src 42:f4:50:5a:2e:a3 | Type 0x86dd
-Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:ff:5a:2e:a3 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:16 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:02 | Src 46:f7:6f:38:72:ea | Type 0x86dd
-Frame: Dest 33:33:00:00:00:fb | Src 46:f7:6f:38:72:ea | Type 0x86dd
-
-0x86dd -> IPv6
-MAC address starting with 33:33 are not physical device. They are IPv6 Multicast MAC addresses.
-Now i'm decided not to dig more on mac address 33:33:*
-
-*/
-
-//-----------
-/*
-What i need?
-1. i need to activate bring a new interface for networking
-2. make it active
-3. receive the traffic in that port and log them
-task open a new TAP interface
-
-find TAP related resources 
-1. man -k TUP : useless
-2. find /usr/include -iname **TUN**
-    /usr/include/linux/if_tun.h - InterFace TUNnel
-3. grep -r "TUN" /usr/include/linux 
-    /usr/include/linux/if_tun.h:#define IFF_TAP             0x0002    
-4. device search
-    find /dev -iname tun:/dev/net/tun
-5. Now find the appropriate data structure
-    1. grep -r TUNSETIFF /usr/include/linux/if_tun.h
-    #define TUNSETIFF     _IOW('T', 202, int) 
-    says int, how would we name inside int, it feels like wrong, this is not the correct structure
-
-    2. check for include chain the file and look for any hint
-    grep -r include /usr/include/linux/if_tun.h
-    everything here is raw type so no use
-
-    3. see the header file name it is if_tun.h, here tun is the device what is the if means, it is interface
-    grep -r -E 'struct if\w*\b' /usr/include/
-
-    now we have `/usr/include/linux/if.h` take a look inside
-    ifreq has name 
-
-(alternate way)
-5. we know tap is a network device, so search for 
-    `man -k network -s 2,3,7` look for (2   System calls, 3   Library calls, 7   Miscellaneous) read the one line description
-    short listed
-    if_freenameindex (3) - get network interface names and indexes
-    if_indextoname (3)   - mappings between network interface names and indexes
-    netdevice (7)        - low-level access to Linux network devices
-    check each
-    if_freenameindex/if_indextoname is only getter 
-
-
-    `man netdevice` is promissing found the `ifreq`
-*/
-
-/*
+*//*
 Task : Open a virtual NIC device with name jitap 
 */
 #include <stdio.h>
@@ -213,7 +20,12 @@ int main(){
 
     find the related resource
     1.  man -k 'TUP|TAP' | grep -E "network|interface" : useless
-    2. find /usr/include -type f \( -iname "*tun*" -o -iname "*tap*" \) or  grep -rE "TUN|TAP" /usr/include/
+    2. `find /usr/include -type f \( -iname "*tun*" -o -iname "*tap*" \)` 
+            Find any file name has `tun` or `tap` 
+        or  
+        `grep -rE "TUN|TAP" /usr/include/`
+            search the word TUN or TAP in the files inside folder /usr/include/
+
         Found use full /usr/include/linux/if_tun.h - InterFace TUNnel
     3. device search
          find /dev  -type c \( -iname "tun" -o -iname "tap" \): /dev/net/tun
@@ -221,10 +33,8 @@ int main(){
     int fd = open("/dev/net/tun", O_RDWR);
 
     /*
-    1. man open
-    it says error in errno
-    so check for 
-    2. man errno
+    1. man open  -> says errno is set on failure
+    2. man errno  -> need to print errno 
     3. err(3), error(3), perror(3), strerror(3)
     */
     if(fd < 0) {
@@ -232,23 +42,24 @@ int main(){
     }
 
     /*
-    Now need to set the name to config the device need to do the ioctl
+    Goal: configure the TAP interface name via ioctl.
 
-    man ioctl
+    `man ioctl`
 
     Now we need the parameter
-    1. fd
-    2. Flag
+    1. file descriptor: fd
+    2. op: Discovering the Request Code (op)
         1. grep -ir set /usr/include/linux/if_tun.h
             Know the linux convention 
                 1. IF -> InterFace
                 2. IFF -> InterFace Flag 
                 TUNSETIFF -> TUN -> device SET -> set IFF -> InterFace Flag 
                 _IOW means IO Write
-            #define TUNSETIFF     _IOW('T', 202, int) 
+             Target Definition found for grep:
+                `#define TUNSETIFF     _IOW('T', 202, int) `
     3. Data structure
         #define TUNSETIFF     _IOW('T', 202, int) 
-            says int, how would  name inside int, it feels like wrong, this is not the correct structure
+            The macro definition references an 'int', but we need to pass a string (the interface name "jitap"). An 'int' cannot hold a string.
         
         Method 1. 
             1. check for include chain the file and look for any hint
@@ -261,16 +72,18 @@ int main(){
                 ifreq has name 
         Method 2.
             we know tap is a network device, so search for 
-        `man -k network -s 2,3,7` look for (2   System calls, 3   Library calls, 7   Miscellaneous) read the one line description
-        short listed
-        if_freenameindex (3) - get network interface names and indexes
-        if_indextoname (3)   - mappings between network interface names and indexes
-        netdevice (7)        - low-level access to Linux network devices
-        check each
-        if_freenameindex/if_indextoname is only getter 
 
-
-        `man netdevice` is promissing found the `ifreq`
+            `man -k network -s 2,3,7` look for (2   System calls, 3   Library calls, 7   Miscellaneous) read the one line description
+            short listed
+            1. if_freenameindex (3) - get network interface names and indexes
+            2. if_indextoname (3)   - mappings between network interface names and indexes
+            3. netdevice (7)        - low-level access to Linux network devices
+            
+            check each
+            if_freenameindex/if_indextoname is only getter 
+            `man netdevice` is promissing found the `ifreq`
+        Method 3. 
+            Search in kernel docs https://docs.kernel.org/networking/tuntap.html
         
     */
 
@@ -289,18 +102,23 @@ int main(){
     // }
     // interface config: Invalid argument
 
-    // re-read both /usr/include/linux/if_tun.h and man netdevice
+    //----------------------------------
+
+    // re-read both /usr/include/linux/if_tun.h and `man netdevice
     /*
     if_tun's IFflags only support int, but we passed `struct ifreq`
 
     in /usr/include/linux/if_tun.h  read the config section for TUNSETIFF, it supports 4 flags TU, TAP, NAPI and NAPI_FRAGS, we need TAP
     */
+
     // int res = ioctl(fd, TUNSETIFF, IFF_TAP);
     // if(res < 0) {
     //     perror("interface config");
 
     // }
-    // interface config: Bad address
+    // interface config: Bad address // ioctl expect address
+
+    //------------------------------------
 
     /*
     read the /usr/include/linux/if.h 's ifreq or man netdevice
@@ -312,11 +130,145 @@ int main(){
         perror("interface config");
 
     }
-    while (1){}
-    return 0;
-
     /*
     4: jitap: <BROADCAST,MULTICAST> mtu 1500 qdisc noop state DOWN mode DEFAULT group default qlen 1000
     link/ether 32:00:05:9d:7d:4a brd ff:ff:ff:ff:ff:ff
     */
+
+    /*
+    Goal enable the device
+    Now we should follow the ifreq related ioctl op codes, not if_tun's IOCTL opcode
+    because now we are configure network interface, not a virtual device, ifreq is commoon
+
+    1. man netdevice
+    SIOCSIFFLAGS -> 
+    IFF_UP            Interface is running.
+    */
+
+    // interface.ifr_flags = interface.ifr_flags | IFF_UP;
+
+    // res = ioctl(fd, SIOCSIFFLAGS, &interface);
+    // if(res < 0) {
+    //     perror("interface up");
+
+    // }
+
+    // interface up: Invalid argument
+
+    // error reason might be SIOCSIFFLAGS don't know about IFF_TAP, so create new flag
+
+    // struct ifreq config;
+    // memset(&config, 0, sizeof(struct ifreq));
+    // config.ifr_flags =  IFF_UP;
+
+    // res = ioctl(fd, SIOCSIFFLAGS, &config);
+    // if(res < 0) {
+    //     perror("config up");
+    // }
+
+    // still error
+
+    /*
+    serach for IOCTL's param
+    1. check in flag symbol
+        grep -r SIOCSIFFLAGS /usr/include
+            $ /usr/include/x86_64-linux-gnu/bits/ioctls.h:#define SIOCSIFFLAGS        0x8914
+            no luck
+            how to find it's param type
+    */
+   // issue is as per `man netdevice` it require socket's file descriptor
+
+        /*
+    man -k socket -s 2,3,7
+    socket (7)           - Linux socket interface
+
+    socket is an endpoint for communication
+
+        It has 3 arguments 
+        1. domain
+        2. type
+        3. protocol
+
+        Domain : Defines addressing nature
+            * AF_INET - ipv4
+            * AF_INET6 - IPv6
+            * AF_PACKET - Low-level packet interface
+
+            `man 7 address_families`
+
+        Type: Nature of communication 
+            * SOCK_STREAM - sequenced, reliable, two-way, connection-based byte streams.
+            * SOCK_DGRAM - connectionless, unreliable messages
+            * SOCK_RAW - Provides raw network protocol access. 
+                - SOCK_DGRAM and SOCK_RAW sockets allow sending of datagrams
+            * SOCK_PACKET  - is an obsolete socket type to receive raw packets directly from the device driver
+                - This is the RAW packet see `man 7 packet`.
+
+        Protocol: 
+            Usually for the type of socket single protocol will be present, in this case it can be specified as 0
+            example SOCK_STREAM: TCP, SOCK_DGRAM: UDP
+            How ever It is possible that multiple protocol may exists for a type
+            example: SOCK_PACKET: TCP, UDP, ICMP
+
+            `man 5 protocols`
+
+    man 7 packet
+        - SOCK_RAW for raw packets including the link-level header
+        - SOCK_DGRAM for cooked packets with the link-level  header  removed
+        - When protocol is set to htons(ETH_P_ALL), then all protocols are received. All incoming packets of that protocol type will be passed to the packet socket before they are passed to the protocols implemented in the kernel
+        - If  protocol is set to zero, no packets are received.
+        - SOCK_RAW is similar to but not compatible with the obsolete AF_INET/SOCK_PACKET of Linux 2.0
+
+    Notes
+        From here got to know 
+        * Domain: AF_PACKET
+        * Type: SOCK_RAW or SOCK_PACKET
+            * need to check the difference
+        * Protocol: htons(ETH_P_ALL) : is this only for SOCK_RAW?
+        
+        Which has to use SOCK_RAW or SOCK_PACKET? seems like both for same purpose
+        let's use AF_PACKET, SOCK_RAW and ETH_P_ALL
+        
+    */
+    int sfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    if(sfd < 0){
+        perror("Socket creation");
+    }
+
+    // now try from the start
+    interface.ifr_flags = interface.ifr_flags | IFF_UP;
+    res = ioctl(sfd, SIOCSIFFLAGS, &interface);
+    if(res < 0) {
+        perror("interface up");
+    }
+
+    // up successfully, socket identify happens by the name 
+    /*
+    5: jitap: <BROADCAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UNKNOWN mode DEFAULT group default qlen 1000
+    link/ether 32:00:05:9d:7d:4a brd ff:ff:ff:ff:ff:ff
+    */
+
+    /*
+    One problem in previous output Multicast is there but it is removed
+    read the `man netdevices` check the flag section and add `IFF_MULTICAST`
+    */
+
+    // now try from the start
+    interface.ifr_flags = interface.ifr_flags | IFF_MULTICAST;
+    res = ioctl(sfd, SIOCSIFFLAGS, &interface);
+    if(res < 0) {
+        perror("interface up");
+    }
+    /*
+    6: jitap: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UNKNOWN mode DEFAULT group default qlen 1000
+    link/ether 32:00:05:9d:7d:4a brd ff:ff:ff:ff:ff:ff
+    */
+
+    /*
+    * Now goal is to log the receiving packets from the interface
+    */
+
+    while (1){}
+    return 0;
+
 }
