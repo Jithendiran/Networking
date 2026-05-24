@@ -2,7 +2,8 @@
 /*
 * Author: E.K.Jithendiran
 * Date  : 18.5.2026 
-*//*
+*/
+/*
 Task : Open a virtual NIC device with name jitap 
 */
 #include <stdio.h>
@@ -12,6 +13,10 @@ Task : Open a virtual NIC device with name jitap
 #include <net/if.h>
 #include <linux/if_tun.h>
 #include <string.h>
+#include <unistd.h>
+#include <linux/if_ether.h>
+#include <arpa/inet.h>
+
 
 static const char * name = "jitap"; 
 int main(){
@@ -264,11 +269,61 @@ int main(){
     link/ether 32:00:05:9d:7d:4a brd ff:ff:ff:ff:ff:ff
     */
 
-    /*
+   /*
     * Now goal is to log the receiving packets from the interface
+    * we have 2 fd's one for virtual interface and one for socket
+    * If we use hardware interface we would directly use the socket step by name, so the read only happens through socket
+    * also as per `man socket` read(2), recv(2) used for reading
     */
+    char buf[1024];
+    
+    while (1){
+        /* 
+        man 2 read
+        1. return 0 -> EOF
+        2. return n <= requested -> available to read
+        3. return -1 error, set tp errno 
+        */
+        res = read(sfd, &buf, 1024);
+        if(res < 0){
+            perror("Read socket");
+            return 1;
+        }
 
-    while (1){}
+        // in this 1024 will it contain more than 1 ethernet frame? how to identify that?
+        /*
+        * Stream sockets (SOCK_STREAM) — read() returns however many bytes are available, may span multiple messages.
+        * Datagram sockets (SOCK_RAW, SOCK_DGRAM) — read() returns exactly one datagram per call.
+        */
+        
+        /*
+        Now what is the data structure to read? 
+        SOCK_RAW which includes layer 2 packet, it is ethernet
+        search for 
+        1. `man -k eth`
+        2. grep -r eth /usr/include (many file)
+        3. from the above things we know if_ so search for this pattern any luck
+            find /usr/include -name "if_*.h" -exec grep -H "eth" {} +
+            short list
+            1. /usr/include/linux/if_link.h
+            2. /usr/include/linux/if_ether.h
+                -> has ethhdr
+        */
+
+
+        
+        struct ethhdr *frame = (struct ethhdr *)buf;
+        printf("Src MAC: %02x:%02x:%02x:%02x:%02x:%02x\t",
+            frame->h_source[0],frame->h_source[1],frame->h_source[2],
+            frame->h_source[3],frame->h_source[4],frame->h_source[5]);
+        printf("Dst MAC: %02x:%02x:%02x:%02x:%02x:%02x\t",
+            frame->h_dest[0],frame->h_dest[1],frame->h_dest[2],
+            frame->h_dest[3],frame->h_dest[4],frame->h_dest[5]);
+
+        
+        printf("Protocol: (0x%04x)\n",ntohs(frame->h_proto));
+
+    }
     return 0;
 
 }
