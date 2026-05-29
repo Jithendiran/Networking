@@ -92,6 +92,133 @@ write to the socket
         
 */
 #include <stdio.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <linux/if_tun.h>
+#include <string.h>
+#include <unistd.h>
+#include <linux/if_ether.h>
+#include <arpa/inet.h>
+
+static const char * protoname(u_int16_t type){
+    switch (type)
+    {
+        case 0x0800:    return "IPv4";
+        case 0x0806:    return "ARP";
+        case 0x86DD:    return "IPv6";
+        default:        return "Unknown";
+    }
+}
+
+static const char * name = "jitap"; 
 int main(){
+    int fd = open("/dev/net/tun", O_RDWR);
+
+    if(fd < 0) {
+        perror("open TUN");
+        return 1;
+    }
+
+
+    struct ifreq interface;
+    memset(&interface, 0, sizeof(struct ifreq));
+
+    strcpy(interface.ifr_name, name);
+    interface.ifr_flags = IFF_TAP | IFF_NO_PI;
+
+    int res = ioctl(fd, TUNSETIFF, &interface);
+    if(res < 0) {
+        perror("interface config");
+
+    }
+    
+    int sfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    if(sfd < 0){
+        perror("Socket creation");
+    }
+
+    // now try from the start
+    interface.ifr_flags = interface.ifr_flags | IFF_UP | IFF_MULTICAST;
+    res = ioctl(sfd, SIOCSIFFLAGS, &interface);
+    if(res < 0) {
+        perror("interface up");
+        close(fd);
+        return 1;
+    }
+
+
+    // read MAC address, to up the interface we use socket, so mostly using only socket we can find it's MAC address
+    //1. $ man  socket // no use
+    //2. $  man -k address
+    
+    /*
+    //2. $  man -k address 
+ether_aton (3)       - Ethernet address manipulation routines
+ether_aton_r (3)     - Ethernet address manipulation routines
+ether_hostton (3)    - Ethernet address manipulation routines
+ether_line (3)       - Ethernet address manipulation routines
+ether_ntoa (3)       - Ethernet address manipulation routines
+ether_ntoa_r (3)     - Ethernet address manipulation routines
+freehostent (3)      - get network hostnames and addresses
+freeifaddrs (3)      - get interface addresses
+sockaddr (3type)     - socket address
+sockaddr_in (3type)  - socket address
+
+------------------
+freehostent (3)      - get network hostnames and addresses
+1. man 3 freehostent
+// Use getaddrinfo(3) and getnameinfo(3) instead.
+2. man 3 getaddrinfo
+// struct sockaddr  // search for this word
+// reference inside net/if.h, either read `man 7 netdevice` or `grep -r "IFF_UP" /usr/include`
+/usr/include/linux/if.h here need to find the ioctl flag to get the infomation from interface
+search for grep -rn SIOCSIFFLAGS /usr/include
+found ref /usr/include/x86_64-linux-gnu/bits/ioctls.h look for hardware address related 
+SIOCGIFHWADDR
+    */
+
+    res = ioctl(sfd, SIOCGIFHWADDR, &interface);
+    if(res < 0) {
+        perror("SIOCGIFHWADDR");
+        close(sfd);
+        close(fd);
+        return 1;
+    }
+// interface.ifr_hwaddr
+    printf("Address  %02x:%02x:%02x:%02x:%02x:%02x\n", (unsigned char)interface.ifr_hwaddr.sa_data[0], (unsigned char)interface.ifr_hwaddr.sa_data[1],
+    (unsigned char)interface.ifr_hwaddr.sa_data[2],(unsigned char)interface.ifr_hwaddr.sa_data[3], (unsigned char)interface.ifr_hwaddr.sa_data[4], (unsigned char)interface.ifr_hwaddr.sa_data[5]);
+    // matching with the address but need a way to read it through library call
+    // socket address to ether address
+
+    // read ip address
+
+
+    // no longer needed
+    close(sfd);
+    
+    char buf[1500];
+    
+    while (1){
+        res = read(fd, buf, 1500);
+        if(res < 0){
+            perror("Read socket");
+            return 1;
+        }
+        
+        struct ethhdr *frame = (struct ethhdr *)buf;
+        int proto = ntohs(frame->h_proto);
+        printf("Src MAC: %02x:%02x:%02x:%02x:%02x:%02x\t",
+            frame->h_source[0],frame->h_source[1],frame->h_source[2],
+            frame->h_source[3],frame->h_source[4],frame->h_source[5]);
+        printf("Dst MAC: %02x:%02x:%02x:%02x:%02x:%02x\t",
+            frame->h_dest[0],frame->h_dest[1],frame->h_dest[2],
+            frame->h_dest[3],frame->h_dest[4],frame->h_dest[5]);
+
+        printf("Protocol: %s(0x%04x)\n", protoname(proto), proto);
+    }
+    close(fd);
     return 0;
+
 }
