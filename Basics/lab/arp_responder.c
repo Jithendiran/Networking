@@ -193,6 +193,39 @@ SIOCGIFHWADDR
     // socket address to ether address
 
     // read ip address
+    
+     close(sfd);
+
+    /*
+    man 7 netdevice
+        SIOCGIFADDR
+            Get, set, or delete the address of the device using ifr_addr
+    man socket
+         AF_INET      IPv4 Internet protocols                    ip(7)
+    man 7 ip
+         raw_socket = socket(AF_INET, SOCK_RAW, protocol);
+            https://datatracker.ietf.org/doc/html/rfc1700
+            4       IP       Internet Protocol
+    */
+
+    sleep(10); // assign ip in btw `sudo ip addr add 10.0.0.1/24 dev jitap`
+
+    sfd = socket(AF_INET, SOCK_RAW, 4);
+    if(sfd < 0){
+        perror("Socket creation");
+    }
+    
+    res = ioctl(sfd, SIOCGIFADDR, &interface);
+    if(res < 0) {
+        perror("SIOCGIFADDR");
+        close(sfd);
+        close(fd);
+        return 1;
+    }
+    
+   printf("IP Address  %d.%d.%d.%d.%d.%d\n", (unsigned char)interface.ifr_addr.sa_data[0], (unsigned char)interface.ifr_addr.sa_data[1],
+    (unsigned char)interface.ifr_addr.sa_data[2],(unsigned char)interface.ifr_addr.sa_data[3], (unsigned char)interface.ifr_addr.sa_data[4], (unsigned char)interface.ifr_addr.sa_data[5]);
+
 
 
     // no longer needed
