@@ -182,6 +182,8 @@ found ref /usr/include/x86_64-linux-gnu/bits/ioctls.h look for hardware address 
 SIOCGIFHWADDR
     */
 
+    usleep(10000); // for stable MAC
+    
     res = ioctl(sfd, SIOCGIFHWADDR, &interface);
     if(res < 0) {
         perror("SIOCGIFHWADDR");
@@ -251,27 +253,6 @@ SIOCGIFHWADDR
         if(proto == (int)ETH_P_ARP){
             printf("ARP incoming\n");
             fflush(stdout);
-            // ARP
-            int ptr = 14; // Header (6 + 6 + 2)
-            
-            // struct arphdr arp;
-
-            // memcpy(&(arp.ar_hrd), buf+ptr, 2);
-            // ptr +=2;
-            // memcpy(&(arp.ar_pro), buf+ptr, 2);
-            // ptr +=2;
-            // memcpy(&(arp.ar_hln), buf+ptr, 1);
-            // ptr +=1;
-            // memcpy(&(arp.ar_pln), buf+ptr, 1);
-            // ptr +=1;
-            // memcpy(&(arp.ar_op), buf+ptr, 2);
-            // ptr +=2;
-            // existing is not good, so create one
-            // ptr += 2 + 2; // hrd + pro
-            // if(memcmp(buf+ptr, 0x06, sizeof(unsigned char)) != 0) continue;
-            // ptr += 1; // hln
-            // if(memcmp(buf+ptr, 0x04, sizeof(unsigned char)) != 0) continue;
-
             struct __attribute__((packed)) arp {
                 unsigned short int ar_hrd;
                 unsigned short int ar_pro;
@@ -286,28 +267,43 @@ SIOCGIFHWADDR
             struct arp req;
             memcpy(&req, buf+sizeof(struct ethhdr), sizeof(struct arp));
 
-            // if(memcmp(&(req.ar_hrd), (unsigned short int)ARPHRD_ETHER, sizeof(unsigned short int)) != 0) continue;
-            // if(memcmp(req.ar_pro, (unsigned short int)ETH_P_IP, sizeof(unsigned short int)) != 0) continue;
-            if (req.ar_hrd != ARPHRD_ETHER) continue;
-            if (req.ar_pro != (unsigned short int)ETH_P_IP) continue;
-            // if(memcmp(req.ar_hln, ARPHRD_ETHER, sizeof(unsigned char)) != 0) continue;
-            // if(memcmp(req.ar_pln, ETH_P_IP, sizeof(unsigned char)) != 0) continue;
-            if (req.ar_hln != ARPHRD_ETHER) continue;
-            if (req.ar_pln != (unsigned short int)4) continue;
+            if (ntohs(req.ar_hrd) != (unsigned short int)ARPHRD_ETHER) continue;
+            if (ntohs(req.ar_pro) != (unsigned short int)ETH_P_IP) continue;
+            if (req.ar_hln != (unsigned char)6) continue;
+            if (req.ar_pln != (unsigned char)4) continue;
 
-            if(req.ar_op == ARPOP_REQUEST && strcmp(ip, req.ar_tpa) == 0){
-                printf("Received request");
+            if(ntohs(req.ar_op) == ARPOP_REQUEST && memcmp(ip, req.ar_tpa, sizeof(ip)) == 0){
+                printf("Received request\n");
+                struct arp response;
+                struct ethhdr ethres;
+                // construct ETH frame
+                memcpy(ethres.h_dest, frame->h_source, sizeof(frame->h_source));
+                memcpy(ethres.h_source, mac, sizeof(mac));
+                ethres.h_proto = frame->h_proto;
+                // payload
+                response.ar_hrd = htons((unsigned short int)ARPHRD_ETHER);
+                response.ar_pro = htons((unsigned short int)ETH_P_IP);
+                response.ar_hln = (unsigned char)6;
+                response.ar_pln = (unsigned char)4;
+                response.ar_op = (unsigned short int)htons(ARPOP_REPLY);
+                memcpy(response.ar_sha, mac, sizeof(mac));
+                memcpy(response.ar_spa, ip, sizeof(ip));
+                memcpy(response.ar_tha, req.ar_sha, sizeof(req.ar_sha));
+                memcpy(response.ar_tpa, req.ar_spa, sizeof(req.ar_spa));
+
+                // header + payload
+                memcpy(buf, &ethres, sizeof(ethres));
+                memcpy(buf+sizeof(ethres), &response, sizeof(response));
+                size_t len = sizeof(ethres)+sizeof(response);
+                // write
+                res = write(fd, buf, len);
+                if (res != len){
+                    printf("Written only %d\n", res);
+                } else {
+                    printf("Written successfully\n");
+                }
             }
         }
-
-        // printf("Src MAC: %02x:%02x:%02x:%02x:%02x:%02x\t",
-        //     frame->h_source[0],frame->h_source[1],frame->h_source[2],
-        //     frame->h_source[3],frame->h_source[4],frame->h_source[5]);
-        // printf("Dst MAC: %02x:%02x:%02x:%02x:%02x:%02x\t",
-        //     frame->h_dest[0],frame->h_dest[1],frame->h_dest[2],
-        //     frame->h_dest[3],frame->h_dest[4],frame->h_dest[5]);
-
-        // printf("Protocol: %s(0x%04x)\n", protoname(proto), proto);
     }
     close(fd);
     return 0;
