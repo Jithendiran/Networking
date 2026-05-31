@@ -101,6 +101,7 @@ write to the socket
 #include <unistd.h>
 #include <linux/if_ether.h>
 #include <arpa/inet.h>
+#include <net/if_arp.h>
 
 static const char * protoname(u_int16_t type){
     switch (type)
@@ -114,6 +115,8 @@ static const char * protoname(u_int16_t type){
 
 static const char * name = "jitap"; 
 int main(){
+    unsigned char mac[6];
+    unsigned char ip[4];
     int fd = open("/dev/net/tun", O_RDWR);
 
     if(fd < 0) {
@@ -187,14 +190,14 @@ SIOCGIFHWADDR
         return 1;
     }
 // interface.ifr_hwaddr
-    printf("Address  %02x:%02x:%02x:%02x:%02x:%02x\n", (unsigned char)interface.ifr_hwaddr.sa_data[0], (unsigned char)interface.ifr_hwaddr.sa_data[1],
-    (unsigned char)interface.ifr_hwaddr.sa_data[2],(unsigned char)interface.ifr_hwaddr.sa_data[3], (unsigned char)interface.ifr_hwaddr.sa_data[4], (unsigned char)interface.ifr_hwaddr.sa_data[5]);
+    // printf("Address  %02x:%02x:%02x:%02x:%02x:%02x\n", (unsigned char)interface.ifr_hwaddr.sa_data[0], (unsigned char)interface.ifr_hwaddr.sa_data[1],
+    // (unsigned char)interface.ifr_hwaddr.sa_data[2],(unsigned char)interface.ifr_hwaddr.sa_data[3], (unsigned char)interface.ifr_hwaddr.sa_data[4], (unsigned char)interface.ifr_hwaddr.sa_data[5]);
     // matching with the address but need a way to read it through library call
     // socket address to ether address
-
+    memcpy(mac, interface.ifr_hwaddr.sa_data, 6);
     // read ip address
     
-     close(sfd);
+    close(sfd);
 
     /*
     man 7 netdevice
@@ -223,14 +226,17 @@ SIOCGIFHWADDR
         return 1;
     }
     
-   printf("IP Address  %d.%d.%d.%d.%d.%d\n", (unsigned char)interface.ifr_addr.sa_data[0], (unsigned char)interface.ifr_addr.sa_data[1],
-    (unsigned char)interface.ifr_addr.sa_data[2],(unsigned char)interface.ifr_addr.sa_data[3], (unsigned char)interface.ifr_addr.sa_data[4], (unsigned char)interface.ifr_addr.sa_data[5]);
+//    printf("IP Address  %d.%d.%d.%d.%d.%d\n", (unsigned char)interface.ifr_addr.sa_data[0], (unsigned char)interface.ifr_addr.sa_data[1],
+//     (unsigned char)interface.ifr_addr.sa_data[2],(unsigned char)interface.ifr_addr.sa_data[3], (unsigned char)interface.ifr_addr.sa_data[4], (unsigned char)interface.ifr_addr.sa_data[5]);
 
 
-
+    memcpy(ip, interface.ifr_addr.sa_data+2, 4);
     // no longer needed
     close(sfd);
-    
+    printf("Mac address : %02x:%02x:%02x:%02x:%02x:%02x\n", 
+        (unsigned char)mac[0], (unsigned char)mac[1], (unsigned char)mac[2],
+        (unsigned char)mac[3], (unsigned char)mac[4], (unsigned char)mac[5]);
+    printf("Ip address %d.%d.%d.%d\n", ip[0], ip[1], ip[2], ip[3]);
     char buf[1500];
     
     while (1){
@@ -242,14 +248,66 @@ SIOCGIFHWADDR
         
         struct ethhdr *frame = (struct ethhdr *)buf;
         int proto = ntohs(frame->h_proto);
-        printf("Src MAC: %02x:%02x:%02x:%02x:%02x:%02x\t",
-            frame->h_source[0],frame->h_source[1],frame->h_source[2],
-            frame->h_source[3],frame->h_source[4],frame->h_source[5]);
-        printf("Dst MAC: %02x:%02x:%02x:%02x:%02x:%02x\t",
-            frame->h_dest[0],frame->h_dest[1],frame->h_dest[2],
-            frame->h_dest[3],frame->h_dest[4],frame->h_dest[5]);
+        if(proto == (int)ETH_P_ARP){
+            printf("ARP incoming\n");
+            fflush(stdout);
+            // ARP
+            int ptr = 14; // Header (6 + 6 + 2)
+            
+            // struct arphdr arp;
 
-        printf("Protocol: %s(0x%04x)\n", protoname(proto), proto);
+            // memcpy(&(arp.ar_hrd), buf+ptr, 2);
+            // ptr +=2;
+            // memcpy(&(arp.ar_pro), buf+ptr, 2);
+            // ptr +=2;
+            // memcpy(&(arp.ar_hln), buf+ptr, 1);
+            // ptr +=1;
+            // memcpy(&(arp.ar_pln), buf+ptr, 1);
+            // ptr +=1;
+            // memcpy(&(arp.ar_op), buf+ptr, 2);
+            // ptr +=2;
+            // existing is not good, so create one
+            // ptr += 2 + 2; // hrd + pro
+            // if(memcmp(buf+ptr, 0x06, sizeof(unsigned char)) != 0) continue;
+            // ptr += 1; // hln
+            // if(memcmp(buf+ptr, 0x04, sizeof(unsigned char)) != 0) continue;
+
+            struct __attribute__((packed)) arp {
+                unsigned short int ar_hrd;
+                unsigned short int ar_pro;
+                unsigned char ar_hln;
+                unsigned char ar_pln;
+                unsigned short int ar_op;
+                unsigned char ar_sha[6];
+                unsigned char ar_spa[4];
+                unsigned char ar_tha[6];
+                unsigned char ar_tpa[4];
+            };
+            struct arp req;
+            memcpy(&req, buf+sizeof(struct ethhdr), sizeof(struct arp));
+
+            // if(memcmp(&(req.ar_hrd), (unsigned short int)ARPHRD_ETHER, sizeof(unsigned short int)) != 0) continue;
+            // if(memcmp(req.ar_pro, (unsigned short int)ETH_P_IP, sizeof(unsigned short int)) != 0) continue;
+            if (req.ar_hrd != ARPHRD_ETHER) continue;
+            if (req.ar_pro != (unsigned short int)ETH_P_IP) continue;
+            // if(memcmp(req.ar_hln, ARPHRD_ETHER, sizeof(unsigned char)) != 0) continue;
+            // if(memcmp(req.ar_pln, ETH_P_IP, sizeof(unsigned char)) != 0) continue;
+            if (req.ar_hln != ARPHRD_ETHER) continue;
+            if (req.ar_pln != (unsigned short int)4) continue;
+
+            if(req.ar_op == ARPOP_REQUEST && strcmp(ip, req.ar_tpa) == 0){
+                printf("Received request");
+            }
+        }
+
+        // printf("Src MAC: %02x:%02x:%02x:%02x:%02x:%02x\t",
+        //     frame->h_source[0],frame->h_source[1],frame->h_source[2],
+        //     frame->h_source[3],frame->h_source[4],frame->h_source[5]);
+        // printf("Dst MAC: %02x:%02x:%02x:%02x:%02x:%02x\t",
+        //     frame->h_dest[0],frame->h_dest[1],frame->h_dest[2],
+        //     frame->h_dest[3],frame->h_dest[4],frame->h_dest[5]);
+
+        // printf("Protocol: %s(0x%04x)\n", protoname(proto), proto);
     }
     close(fd);
     return 0;
