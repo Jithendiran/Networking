@@ -140,6 +140,7 @@ int main(){
     */
     interface.ifr_flags = IFF_TAP | IFF_NO_PI; // 1st time remove `IFF_NO_PI` and run, then read the comment inside loop
     int res = ioctl(fd, TUNSETIFF, &interface);
+    // jitap will not exists in /dev, not only jitap, none of the network device found in /dev folder
     if(res < 0) {
         perror("interface config");
 
@@ -244,6 +245,9 @@ int main(){
         let's use AF_PACKET, SOCK_RAW and ETH_P_ALL
         
     */
+   // since none of the interface found in /dev, we need a way to config the interface and communicate with interface, the thing used for this purpose is socket
+   // socket are generic interface which is used to configure, read and write from network interface
+   // In our case we created the TAP device programatically so we have fd, but to use real hardware interfaces we don't have any files to open
     int sfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if(sfd < 0){
         perror("Socket creation");
