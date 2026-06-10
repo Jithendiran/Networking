@@ -128,8 +128,8 @@ int main(){
     struct sockaddr_ll device;
     memset(&device, 0, sizeof(device));
     device.sll_family = AF_PACKET;
-    device.sll_protocol = htons(ETH_P_ALL);
-    device.sll_pkttype = PACKET_BROADCAST;
+    device.sll_protocol = 0;//htons(ETH_P_ALL);
+    device.sll_pkttype = PACKET_OUTGOING;
     device.sll_halen = 6;
     device.sll_ifindex = index;
     memcpy(device.sll_addr, mac, 6);
@@ -147,15 +147,65 @@ int main(){
             return 1;
         }
         
-        // receiver mac from sockaddr_ll
-        printf("data");
-        fflush(stdout);
-        
+        struct ethhdr *frame = (struct ethhdr *)buf;
+        int proto = ntohs(frame->h_proto);
+        if(proto == (int)ETH_P_ARP){
+            printf("ARP incoming\n");
+            fflush(stdout);
+            struct __attribute__((packed)) arp {
+                unsigned short int ar_hrd;
+                unsigned short int ar_pro;
+                unsigned char ar_hln;
+                unsigned char ar_pln;
+                unsigned short int ar_op;
+                unsigned char ar_sha[6];
+                unsigned char ar_spa[4];
+                unsigned char ar_tha[6];
+                unsigned char ar_tpa[4];
+            };
+            struct arp req;
+            memcpy(&req, buf+sizeof(struct ethhdr), sizeof(struct arp));
+
+            if (ntohs(req.ar_hrd) != (unsigned short int)ARPHRD_ETHER) continue;
+            if (ntohs(req.ar_pro) != (unsigned short int)ETH_P_IP) continue;
+            if (req.ar_hln != (unsigned char)6) continue;
+            if (req.ar_pln != (unsigned char)4) continue;
+
+            if(ntohs(req.ar_op) == ARPOP_REQUEST && memcmp(ip, req.ar_tpa, sizeof(ip)) == 0){
+                printf("Received request\n");
+                struct arp response;
+                struct ethhdr ethres;
+                // construct ETH frame
+                memcpy(ethres.h_dest, frame->h_source, sizeof(frame->h_source));
+                memcpy(ethres.h_source, mac, sizeof(mac));
+                ethres.h_proto = frame->h_proto;
+                // payload
+                response.ar_hrd = htons((unsigned short int)ARPHRD_ETHER);
+                response.ar_pro = htons((unsigned short int)ETH_P_IP);
+                response.ar_hln = (unsigned char)6;
+                response.ar_pln = (unsigned char)4;
+                response.ar_op = (unsigned short int)htons(ARPOP_REPLY);
+                memcpy(response.ar_sha, mac, sizeof(mac));
+                memcpy(response.ar_spa, ip, sizeof(ip));
+                memcpy(response.ar_tha, req.ar_sha, sizeof(req.ar_sha));
+                memcpy(response.ar_tpa, req.ar_spa, sizeof(req.ar_spa));
+
+                // header + payload
+                memcpy(buf, &ethres, sizeof(ethres));
+                memcpy(buf+sizeof(ethres), &response, sizeof(response));
+                size_t len = sizeof(ethres)+sizeof(response);
+                // write
+                res = write(fd, buf, len);
+                if (res != len){
+                    printf("Written only %d\n", res);
+                } else {
+                    printf("Written successfully\n");
+                }
+            }
+        }
     }
     close(sfd);
     close(fd);
     return 0;
 
 }
-
-// debug why data not printing when  arping 10.0.0.1 -I jitap
